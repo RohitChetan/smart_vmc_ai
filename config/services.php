@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'ai_worker' => [
+        'key' => env('AI_WORKER_KEY'),
+    ],
+
 ];
