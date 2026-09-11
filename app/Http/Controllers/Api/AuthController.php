@@ -10,9 +10,38 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    /**
-     * Login user and return Sanctum token.
-     */
+    public function register(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user = User::create([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => $data['password'],
+            'role' => 'citizen',
+            'ward_id' => null,
+        ]);
+
+        $token = $user->createToken('smart-vadodara-citizen')->plainTextToken;
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Citizen registration successful.',
+            'token' => $token,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'ward_id' => $user->ward_id,
+            ],
+        ], 201);
+    }
+
     public function login(Request $request)
     {
         $credentials = $request->validate([
@@ -36,14 +65,12 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Login successful.',
             'token' => $token,
-
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
                 'ward_id' => $user->ward_id,
-
                 'ward' => $user->ward ? [
                     'id' => $user->ward->id,
                     'ward_no' => $user->ward->ward_no,
@@ -53,23 +80,18 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * Return currently authenticated user.
-     */
     public function me(Request $request)
     {
         $user = $request->user()->load('ward');
 
         return response()->json([
             'success' => true,
-
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
                 'ward_id' => $user->ward_id,
-
                 'ward' => $user->ward ? [
                     'id' => $user->ward->id,
                     'ward_no' => $user->ward->ward_no,
@@ -79,9 +101,6 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * Logout current session/token.
-     */
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()?->delete();

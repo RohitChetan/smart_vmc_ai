@@ -36,7 +36,7 @@
     </header>
 
 
-    <main class="px-5 pb-8 pt-5">
+    <main class="px-5 pb-28 pt-5">
 
         {{-- Intro --}}
         <div class="rounded-2xl bg-indigo-50 p-4">
@@ -346,9 +346,10 @@
 
         {{-- Submit --}}
         <button
-            id="submitButton"
             type="button"
-            class="mt-7 w-full rounded-2xl bg-indigo-600 px-5 py-4 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+            id="submitComplaintButton"
+            onclick="submitComplaint()"
+            class="mt-6 w-full rounded-2xl bg-indigo-600 px-5 py-4 text-sm font-bold text-white shadow-lg transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
             Submit Complaint
         </button>
@@ -366,6 +367,8 @@
 
 <script>
 
+const token = localStorage.getItem('smart_vadodara_token');
+
 let latitude = null;
 let longitude = null;
 let locationAccuracy = null;
@@ -375,100 +378,121 @@ let selectedFiles = [];
 
 /*
 |--------------------------------------------------------------------------
-| Location
+| Authentication
+|--------------------------------------------------------------------------
+*/
+
+if (!token) {
+    window.location.href = "{{ route('citizen.login') }}";
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Elements
+|--------------------------------------------------------------------------
+*/
+
+const descriptionInput =
+    document.getElementById('description');
+
+const categoryInput =
+    document.getElementById('category');
+
+const cameraInput =
+    document.getElementById('cameraInput');
+
+const mediaInput =
+    document.getElementById('mediaInput');
+
+const mediaPreview =
+    document.getElementById('mediaPreview');
+
+const locationStatus =
+    document.getElementById('locationStatus');
+
+const locationText =
+    document.getElementById('locationText');
+
+const coordinates =
+    document.getElementById('coordinates');
+
+const errorBox =
+    document.getElementById('errorBox');
+
+const successBox =
+    document.getElementById('successBox');
+
+
+/*
+|--------------------------------------------------------------------------
+| Location Detection
 |--------------------------------------------------------------------------
 */
 
 function detectLocation() {
 
-    const status = document.getElementById('locationStatus');
-    const text = document.getElementById('locationText');
-    const coordinates = document.getElementById('coordinates');
-
     if (!navigator.geolocation) {
 
-        status.textContent = 'Unavailable';
-        text.textContent = 'Location is not supported by this browser.';
+        locationStatus.textContent =
+            'Not supported';
+
+        locationText.textContent =
+            'Your browser does not support GPS location.';
+
         return;
     }
 
-    status.textContent = 'Detecting...';
-    text.textContent = 'Getting your current location...';
+    locationStatus.textContent =
+        'Detecting...';
+
+    locationText.textContent =
+        'Getting your current location...';
 
     navigator.geolocation.getCurrentPosition(
 
-        async function(position) {
+        function(position) {
 
-            latitude = position.coords.latitude;
-            longitude = position.coords.longitude;
-            locationAccuracy = position.coords.accuracy;
+            latitude =
+                position.coords.latitude;
+
+            longitude =
+                position.coords.longitude;
+
+            locationAccuracy =
+                position.coords.accuracy;
+
+            locationStatus.textContent =
+                'Detected';
+
+            locationStatus.className =
+                'text-xs font-medium text-emerald-600';
+
+            locationText.textContent =
+                'Location detected successfully';
 
             coordinates.textContent =
-                `${latitude.toFixed(6)}, ${longitude.toFixed(6)} • ±${Math.round(locationAccuracy)}m`;
-
-            status.textContent = 'Detected ✓';
-            status.className =
-                'text-xs font-semibold text-emerald-600';
-
-            text.textContent =
-                'Checking VMC ward...';
-
-            try {
-
-                const response = await fetch(
-                    '/api/location/detect-ward',
-                    {
-                        method: 'POST',
-
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json'
-                        },
-
-                        body: JSON.stringify({
-                            latitude: latitude,
-                            longitude: longitude
-                        })
-                    }
-                );
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(
-                        data.message ||
-                        'Location is outside VMC boundaries.'
-                    );
-                }
-
-                text.textContent =
-                    `Ward ${data.ward.ward_no} • ${data.ward.name}`;
-
-                text.className =
-                    'text-sm font-semibold text-emerald-700';
-
-            } catch (error) {
-
-                text.textContent =
-                    error.message;
-
-                text.className =
-                    'text-sm font-semibold text-red-600';
-
-            }
-
+                `${latitude.toFixed(7)}, ${longitude.toFixed(7)} • Accuracy ±${Math.round(locationAccuracy)}m`;
         },
 
         function(error) {
 
-            status.textContent = 'Permission required';
+            console.error(
+                'GPS error:',
+                error
+            );
 
-            text.textContent =
-                'Please allow location access to submit a complaint.';
+            locationStatus.textContent =
+                'Failed';
+
+            locationStatus.className =
+                'text-xs font-medium text-red-600';
+
+            locationText.textContent =
+                'Please allow location access to submit the complaint.';
 
             coordinates.textContent =
-                error.message || 'Unable to detect location.';
-
+                'Location permission is required.';
         },
 
         {
@@ -476,377 +500,599 @@ function detectLocation() {
             timeout: 15000,
             maximumAge: 0
         }
-
     );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| Media
+| Camera Input
 |--------------------------------------------------------------------------
 */
 
-function updateMediaPreview() {
+cameraInput?.addEventListener(
+    'change',
+    function(event) {
 
-    const preview =
-        document.getElementById('mediaPreview');
+        addFiles(event.target.files);
 
-    if (selectedFiles.length === 0) {
+        event.target.value = '';
+    }
+);
 
-        preview.classList.add('hidden');
-        preview.innerHTML = '';
+
+/*
+|--------------------------------------------------------------------------
+| Gallery / Media Input
+|--------------------------------------------------------------------------
+*/
+
+mediaInput?.addEventListener(
+    'change',
+    function(event) {
+
+        addFiles(event.target.files);
+
+        event.target.value = '';
+    }
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| Add Files
+|--------------------------------------------------------------------------
+*/
+
+function addFiles(files) {
+
+    for (const file of files) {
+
+        const isImage =
+            file.type.startsWith('image/');
+
+        const isVideo =
+            file.type.startsWith('video/');
+
+        if (!isImage && !isVideo) {
+            continue;
+        }
+
+        if (file.size > 50 * 1024 * 1024) {
+
+            showError(
+                `${file.name} is larger than 50 MB.`
+            );
+
+            continue;
+        }
+
+        selectedFiles.push(file);
+    }
+
+    renderMediaPreview();
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Media Preview
+|--------------------------------------------------------------------------
+*/
+
+function renderMediaPreview() {
+
+    if (!selectedFiles.length) {
+
+        mediaPreview.classList.add('hidden');
+
+        mediaPreview.innerHTML = '';
 
         return;
     }
 
-    preview.classList.remove('hidden');
+    mediaPreview.classList.remove('hidden');
 
-    preview.innerHTML = '';
+    mediaPreview.innerHTML = `
+        <div class="space-y-2">
+            ${selectedFiles.map((file, index) => {
 
-    selectedFiles.forEach((file, index) => {
+                const url =
+                    URL.createObjectURL(file);
 
-        const wrapper =
-            document.createElement('div');
+                if (file.type.startsWith('image/')) {
 
-        wrapper.className =
-            'mb-2 flex items-center justify-between rounded-xl bg-slate-50 p-3';
+                    return `
+                        <div class="flex items-center gap-3 rounded-xl border border-slate-200 p-2">
 
-        wrapper.innerHTML = `
-            <div class="flex min-w-0 items-center gap-3">
-                <span class="text-xl">
-                    ${file.type.startsWith('video/') ? '🎥' : '🖼️'}
-                </span>
+                            <img
+                                src="${url}"
+                                class="h-16 w-16 rounded-lg object-cover"
+                            >
 
-                <div class="min-w-0">
-                    <p class="truncate text-sm font-medium">
-                        ${file.name}
-                    </p>
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate text-sm font-medium">
+                                    ${escapeHtml(file.name)}
+                                </p>
 
-                    <p class="text-xs text-slate-400">
-                        ${(file.size / 1024 / 1024).toFixed(1)} MB
-                    </p>
-                </div>
-            </div>
+                                <p class="text-xs text-slate-400">
+                                    ${formatFileSize(file.size)}
+                                </p>
+                            </div>
 
-            <button
-                type="button"
-                data-index="${index}"
-                class="remove-media ml-3 text-sm font-semibold text-red-500"
-            >
-                Remove
-            </button>
-        `;
+                            <button
+                                type="button"
+                                onclick="removeFile(${index})"
+                                class="px-2 text-red-500"
+                            >
+                                ✕
+                            </button>
 
-        preview.appendChild(wrapper);
-    });
-
-    document.querySelectorAll('.remove-media')
-        .forEach(button => {
-
-            button.addEventListener(
-                'click',
-                function() {
-
-                    const index =
-                        Number(this.dataset.index);
-
-                    selectedFiles.splice(index, 1);
-
-                    updateMediaPreview();
+                        </div>
+                    `;
                 }
-            );
 
-        });
+                return `
+                    <div class="flex items-center gap-3 rounded-xl border border-slate-200 p-3">
+
+                        <div class="text-2xl">
+                            🎥
+                        </div>
+
+                        <div class="min-w-0 flex-1">
+
+                            <p class="truncate text-sm font-medium">
+                                ${escapeHtml(file.name)}
+                            </p>
+
+                            <p class="text-xs text-slate-400">
+                                ${formatFileSize(file.size)}
+                            </p>
+
+                        </div>
+
+                        <button
+                            type="button"
+                            onclick="removeFile(${index})"
+                            class="px-2 text-red-500"
+                        >
+                            ✕
+                        </button>
+
+                    </div>
+                `;
+
+            }).join('')}
+        </div>
+    `;
 }
-
-
-function addFiles(files) {
-
-    const incoming =
-        Array.from(files);
-
-    selectedFiles =
-        [...selectedFiles, ...incoming];
-
-    if (selectedFiles.length > 5) {
-
-        selectedFiles =
-            selectedFiles.slice(0, 5);
-
-        showError(
-            'You can upload maximum 5 files.'
-        );
-    }
-
-    updateMediaPreview();
-}
-
-
-document
-    .getElementById('cameraInput')
-    .addEventListener(
-        'change',
-        function() {
-
-            addFiles(this.files);
-
-            this.value = '';
-
-        }
-    );
-
-
-document
-    .getElementById('mediaInput')
-    .addEventListener(
-        'change',
-        function() {
-
-            addFiles(this.files);
-
-            this.value = '';
-
-        }
-    );
 
 
 /*
 |--------------------------------------------------------------------------
-| Error
+| Remove File
+|--------------------------------------------------------------------------
+*/
+
+function removeFile(index) {
+
+    selectedFiles.splice(index, 1);
+
+    renderMediaPreview();
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Submit Complaint
+|--------------------------------------------------------------------------
+*/
+
+async function submitComplaint() {
+
+    hideMessages();
+
+    const description =
+        descriptionInput.value.trim();
+
+    if (!description) {
+
+        showError(
+            'Please describe the civic issue.'
+        );
+
+        descriptionInput.focus();
+
+        return;
+    }
+
+    if (latitude === null || longitude === null) {
+
+        showError(
+            'Please allow location access before submitting.'
+        );
+
+        detectLocation();
+
+        return;
+    }
+
+    if (!selectedFiles.length) {
+
+        showError(
+            'Please upload at least one photo or video.'
+        );
+
+        return;
+    }
+
+
+    const submitButton =
+        document.getElementById('submitComplaintButton');
+
+    if (submitButton) {
+
+        submitButton.disabled = true;
+
+        submitButton.textContent =
+            'Submitting...';
+    }
+
+
+    try {
+
+        const formData =
+            new FormData();
+
+        formData.append(
+            'description',
+            description
+        );
+
+        formData.append(
+            'latitude',
+            latitude
+        );
+
+        formData.append(
+            'longitude',
+            longitude
+        );
+
+        formData.append(
+            'location_accuracy',
+            locationAccuracy ?? ''
+        );
+
+
+        if (categoryInput?.value) {
+
+            formData.append(
+                'category_id',
+                categoryInput.value
+            );
+        }
+
+
+        selectedFiles.forEach(
+            function(file) {
+
+                formData.append(
+                    'media[]',
+                    file
+                );
+            }
+        );
+
+
+        const response =
+            await fetch('/api/complaints', {
+
+                method: 'POST',
+
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+
+                body: formData
+            });
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok || !data.success) {
+
+            let message =
+                data.message ||
+                'Unable to submit complaint.';
+
+            if (data.errors) {
+
+                const validationMessages =
+                    Object.values(data.errors)
+                        .flat();
+
+                if (validationMessages.length) {
+
+                    message =
+                        validationMessages.join(' ');
+                }
+            }
+
+            throw new Error(message);
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Success
+        |--------------------------------------------------------------------------
+        */
+
+        document.getElementById(
+            'complaintNumber'
+        ).textContent =
+            data.complaint.complaint_number;
+
+
+        // Show the ward detected by backend GIS
+        const wardElement =
+            document.getElementById('complaintWard');
+
+        if (wardElement) {
+            if (data.complaint && data.complaint.ward) {
+                wardElement.textContent =
+                    `Ward ${data.complaint.ward.ward_no} – ${data.complaint.ward.name}`;
+            } else {
+                wardElement.textContent =
+                    'Ward will be determined by GIS';
+            }
+        }
+
+
+        successBox.classList.remove(
+            'hidden'
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Hide Form Sections
+        |--------------------------------------------------------------------------
+        */
+
+        descriptionInput.disabled = true;
+
+        if (categoryInput) {
+            categoryInput.disabled = true;
+        }
+
+        cameraInput.disabled = true;
+        mediaInput.disabled = true;
+
+
+        if (submitButton) {
+
+            submitButton.disabled = true;
+
+            submitButton.textContent =
+                'Complaint Submitted';
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Scroll to success
+        |--------------------------------------------------------------------------
+        */
+
+        successBox.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+        });
+
+
+    } catch (error) {
+
+        console.error(
+            'Complaint submission error:',
+            error
+        );
+
+        showError(
+            error.message ||
+            'Something went wrong while submitting your complaint.'
+        );
+
+
+        if (submitButton) {
+
+            submitButton.disabled = false;
+
+            submitButton.textContent =
+                'Submit Complaint';
+        }
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Location Detection on Page Load
+|--------------------------------------------------------------------------
+*/
+
+detectLocation();
+
+
+/*
+|--------------------------------------------------------------------------
+| Helpers
 |--------------------------------------------------------------------------
 */
 
 function showError(message) {
 
-    const box =
-        document.getElementById('errorBox');
+    errorBox.textContent =
+        message;
 
-    box.textContent = message;
+    errorBox.classList.remove(
+        'hidden'
+    );
 
-    box.classList.remove('hidden');
-
-    box.scrollIntoView({
+    errorBox.scrollIntoView({
         behavior: 'smooth',
         block: 'center'
     });
 }
 
 
-function clearError() {
+function hideMessages() {
 
-    document
-        .getElementById('errorBox')
-        .classList.add('hidden');
+    errorBox.classList.add(
+        'hidden'
+    );
+
+    successBox.classList.add(
+        'hidden'
+    );
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| Submit
-|--------------------------------------------------------------------------
-*/
+function formatFileSize(bytes) {
 
-document
-    .getElementById('submitButton')
-    .addEventListener(
-        'click',
-        async function() {
+    if (bytes < 1024) {
+        return bytes + ' B';
+    }
 
-            clearError();
+    if (bytes < 1024 * 1024) {
+        return (bytes / 1024).toFixed(1) + ' KB';
+    }
 
-            const description =
-                document
-                    .getElementById('description')
-                    .value
-                    .trim();
-
-            const category =
-                document
-                    .getElementById('category')
-                    .value;
-
-            if (description.length < 5) {
-
-                showError(
-                    'Please describe the problem in at least 5 characters.'
-                );
-
-                return;
-            }
-
-            if (latitude === null || longitude === null) {
-
-                showError(
-                    'Please allow location access before submitting.'
-                );
-
-                detectLocation();
-
-                return;
-            }
-
-            if (selectedFiles.length > 5) {
-
-                showError(
-                    'Maximum 5 files are allowed.'
-                );
-
-                return;
-            }
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
 
 
-            const button = this;
+function escapeHtml(value) {
 
-            button.disabled = true;
-
-            button.textContent =
-                'Submitting...';
-
-
-            const formData =
-                new FormData();
-
-            formData.append(
-                'description',
-                description
-            );
-
-            formData.append(
-                'latitude',
-                latitude
-            );
-
-            formData.append(
-                'longitude',
-                longitude
-            );
-
-            formData.append(
-                'location_accuracy',
-                locationAccuracy ?? ''
-            );
-
-            if (category) {
-
-                formData.append(
-                    'category_id',
-                    category
-                );
-            }
-
-
-            selectedFiles.forEach(
-                function(file) {
-
-                    formData.append(
-                        'media[]',
-                        file
-                    );
-
-                }
-            );
-
-
-            try {
-
-                const response =
-                    await fetch(
-                        '/api/complaints',
-                        {
-                            method: 'POST',
-
-                            headers: {
-                                'Accept':
-                                    'application/json'
-                            },
-
-                            body: formData
-                        }
-                    );
-
-
-                const data =
-                    await response.json();
-
-
-                if (!response.ok) {
-
-                    if (data.errors) {
-
-                        const firstError =
-                            Object.values(data.errors)
-                                .flat()[0];
-
-                        throw new Error(
-                            firstError ||
-                            data.message ||
-                            'Unable to submit complaint.'
-                        );
-                    }
-
-                    throw new Error(
-                        data.message ||
-                        'Unable to submit complaint.'
-                    );
-                }
-
-
-                document
-                    .getElementById('submitButton')
-                    .classList.add('hidden');
-
-
-                document
-                    .getElementById('successBox')
-                    .classList.remove('hidden');
-
-
-                document
-                    .getElementById('complaintNumber')
-                    .textContent =
-                    data.complaint.complaint_number;
-
-
-                document
-                    .getElementById('complaintWard')
-                    .textContent =
-                    `Ward ${data.complaint.ward.ward_no} • ${data.complaint.ward.name}`;
-
-
-                document
-                    .getElementById('successBox')
-                    .scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'center'
-                    });
-
-
-            } catch (error) {
-
-                showError(
-                    error.message
-                );
-
-                button.disabled = false;
-
-                button.textContent =
-                    'Submit Complaint';
-            }
-
-        }
-    );
-
-
-/*
-|--------------------------------------------------------------------------
-| Start
-|--------------------------------------------------------------------------
-*/
-
-detectLocation();
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 
 </script>
+
+
+<!-- Bottom Navigation -->
+<!-- Bottom Navigation -->
+<nav
+    style="
+        position: fixed;
+        left: 50%;
+        bottom: 0;
+        transform: translateX(-50%);
+        width: 100%;
+        max-width: 448px;
+        z-index: 99999;
+        background: #ffffff;
+        border-top: 1px solid #e2e8f0;
+        box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.08);
+    "
+>
+    <div
+        style="
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+        "
+    >
+
+        <a
+            href="{{ route('citizen.home') }}"
+            style="
+                display:flex;
+                flex-direction:column;
+                align-items:center;
+                justify-content:center;
+                min-width:70px;
+                padding:4px 8px;
+                text-decoration:none;
+                color:#64748b;
+                font-size:12px;
+                font-weight:600;
+            "
+        >
+            <span style="font-size:21px; line-height:24px;">🏠</span>
+            <span>Home</span>
+        </a>
+
+        <a
+            href="{{ route('citizen.complaints.create') }}"
+            style="
+                display:flex;
+                flex-direction:column;
+                align-items:center;
+                justify-content:center;
+                min-width:70px;
+                padding:4px 8px;
+                text-decoration:none;
+                color:#4f46e5;
+                font-size:12px;
+                font-weight:700;
+            "
+        >
+            <span style="font-size:21px; line-height:24px;">➕</span>
+            <span>Report</span>
+        </a>
+
+        <a
+            href="{{ route('citizen.track') }}"
+            style="
+                display:flex;
+                flex-direction:column;
+                align-items:center;
+                justify-content:center;
+                min-width:70px;
+                padding:4px 8px;
+                text-decoration:none;
+                color:#64748b;
+                font-size:12px;
+                font-weight:600;
+            "
+        >
+            <span style="font-size:21px; line-height:24px;">🔎</span>
+            <span>Track</span>
+        </a>
+
+        <a
+            href="#"
+            onclick="alert('Civic Points system will be available soon.'); return false;"
+            style="
+                display:flex;
+                flex-direction:column;
+                align-items:center;
+                justify-content:center;
+                min-width:70px;
+                padding:4px 8px;
+                text-decoration:none;
+                color:#64748b;
+                font-size:12px;
+                font-weight:600;
+            "
+        >
+            <span style="font-size:21px; line-height:24px;">🏆</span>
+            <span>Points</span>
+        </a>
+
+    </div>
+</nav>
 
 </body>
 </html>

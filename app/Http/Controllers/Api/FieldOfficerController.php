@@ -91,6 +91,7 @@ class FieldOfficerController extends Controller
                     'id' => $officer->ward->id,
                     'ward_no' => $officer->ward->ward_no,
                     'name' => $officer->ward->name,
+                    'boundary_geojson' => $officer->ward->boundary_geojson,
                 ] : null,
             ],
 

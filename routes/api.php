@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\AIJobController;
 use App\Http\Controllers\Api\FieldOfficerController;
 use App\Http\Controllers\API\AuthController;
 use App\Http\Middleware\AIWorkerAuth;
+use App\Http\Controllers\Api\ResolutionProofController;
 
 
 // ---------------------------------------------------------
@@ -58,6 +59,11 @@ Route::middleware(AIWorkerAuth::class)->group(function () {
 // Authentication APIs
 // ---------------------------------------------------------
 
+Route::post('/auth/register', [
+    AuthController::class,
+    'register',
+]);
+
 Route::post('/auth/login', [
     AuthController::class,
     'login',
@@ -73,6 +79,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [
         AuthController::class,
         'logout',
+    ]);
+
+    Route::get('/citizen/complaints', [
+        \App\Http\Controllers\Api\CitizenComplaintController::class,
+        'index',
     ]);
 
 });
@@ -95,6 +106,11 @@ Route::middleware([
     Route::post('/field/complaints/{complaintId}/status', [
         FieldOfficerController::class,
         'updateStatus',
+    ]);
+
+    Route::post('/field/complaints/{complaintId}/resolution-proof', [
+        ResolutionProofController::class,
+        'store',
     ]);
 
 });

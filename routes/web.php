@@ -10,6 +10,14 @@ Route::get('/citizen', function () {
     return view('citizen.home');
 })->name('citizen.home');
 
+Route::get('/citizen/login', function () {
+    return view('citizen.auth.login');
+})->name('citizen.login');
+
+Route::get('/citizen/register', function () {
+    return view('citizen.auth.register');
+})->name('citizen.register');
+
 Route::get('/citizen/complaints/create', function () {
     return view('citizen.complaints.create');
 })->name('citizen.complaints.create');

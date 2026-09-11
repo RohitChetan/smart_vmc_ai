@@ -70,4 +70,9 @@ class CivicIncident extends Model
     {
         return $this->hasMany(IncidentAssignment::class, 'incident_id');
     }
+
+    public function resolutionProofs(): HasMany
+    {
+        return $this->hasMany(ResolutionProof::class, 'incident_id');
+    }
 }

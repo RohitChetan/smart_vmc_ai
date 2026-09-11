@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\ComplaintAIAnalysis;
 use App\Services\IncidentAssignmentService;
 use App\Services\IncidentClusteringService;
+use App\Services\WardLocator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -74,7 +75,8 @@ class AIJobController extends Controller
         Request $request,
         int $analysisId,
         IncidentClusteringService $incidentService,
-        IncidentAssignmentService $incidentAssignmentService
+        IncidentAssignmentService $incidentAssignmentService,
+        WardLocator $wardLocator
     ): JsonResponse {
         $data = $request->validate([
             'predicted_category' => ['required', 'string', 'max:255'],
@@ -122,13 +124,39 @@ class AIJobController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Update Complaint With AI Decision
+        | Auto Detect Ward From GPS
+        |--------------------------------------------------------------------------
+        */
+
+        $detectedWard = null;
+
+        if (
+            $complaint->latitude !== null &&
+            $complaint->longitude !== null
+        ) {
+            $detectedWard = $wardLocator->findWard(
+                (float) $complaint->latitude,
+                (float) $complaint->longitude
+            );
+        }
+
+        if (!$detectedWard) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to determine ward from complaint GPS location.',
+            ], 422);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Update Complaint With AI Decision + GIS Ward
         |--------------------------------------------------------------------------
         */
 
         $complaint->update([
             'ai_category_id' => $category->id,
             'department_id' => $category->department_id,
+            'ward_id' => $detectedWard->id,
             'priority' => $data['priority'],
             'ai_confidence' => $data['confidence'],
             'ai_decision_reason' => $data['reason'] ?? null,
@@ -147,8 +175,6 @@ class AIJobController extends Controller
         |--------------------------------------------------------------------------
         | Incident-Level Assignment
         |--------------------------------------------------------------------------
-        |
-        | Important:
         |
         | Multiple complaints can belong to the same incident.
         | Only ONE active field assignment is created for that incident.
@@ -186,6 +212,12 @@ class AIJobController extends Controller
 
                 'status' => $complaint->status,
 
+                'ward' => [
+                    'id' => $detectedWard->id,
+                    'ward_no' => $detectedWard->ward_no,
+                    'name' => $detectedWard->name,
+                ],
+
                 'ai_category' => $category->name,
 
                 'department' => $category->department?->name,
@@ -204,6 +236,12 @@ class AIJobController extends Controller
                 'status' => $incident->status,
 
                 'priority' => $incident->priority,
+
+                'ward' => [
+                    'id' => $incident->ward?->id,
+                    'ward_no' => $incident->ward?->ward_no,
+                    'name' => $incident->ward?->name,
+                ],
             ],
 
             'assignment' => [

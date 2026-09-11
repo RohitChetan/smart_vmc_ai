@@ -117,4 +117,9 @@ class Complaint extends Model
     {
         return $this->belongsTo(CivicIncident::class);
     }
+
+    public function resolutionProofs(): HasMany
+    {
+        return $this->hasMany(ResolutionProof::class);
+    }
 }
