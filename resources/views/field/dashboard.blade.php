@@ -488,6 +488,165 @@
         }
 
         /* --------------------------------------------------
+           Resolution Proof Modal
+        -------------------------------------------------- */
+
+        .proof-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 6000;
+            background: rgba(15,23,42,.48);
+            backdrop-filter: blur(5px);
+            padding: 18px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .proof-card {
+            width: min(520px, 100%);
+            max-height: 92vh;
+            overflow-y: auto;
+            background: white;
+            border-radius: 22px;
+            box-shadow: 0 25px 70px rgba(15,23,42,.25);
+        }
+
+        .proof-header {
+            padding: 18px 20px;
+            border-bottom: 1px solid #eef0f3;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .proof-title {
+            font-size: 18px;
+            font-weight: 800;
+        }
+
+        .proof-subtitle {
+            margin-top: 4px;
+            color: #6b7280;
+            font-size: 11px;
+            line-height: 1.45;
+        }
+
+        .proof-close {
+            width: 34px;
+            height: 34px;
+            border: 1px solid #e5e7eb;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        .proof-body {
+            padding: 20px;
+        }
+
+        .proof-incident {
+            padding: 12px;
+            background: #f8fafc;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
+        .proof-label {
+            display: block;
+            margin-bottom: 7px;
+            color: #6b7280;
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .proof-file {
+            width: 100%;
+            padding: 12px;
+            border: 1px dashed #cbd5e1;
+            border-radius: 12px;
+            background: #f8fafc;
+            cursor: pointer;
+        }
+
+        .proof-file-hint {
+            margin-top: 7px;
+            color: #9ca3af;
+            font-size: 10px;
+            line-height: 1.4;
+        }
+
+        .proof-gps {
+            margin-top: 14px;
+            padding: 12px;
+            border-radius: 12px;
+            background: #ecfdf5;
+            color: #065f46;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .proof-gps.error {
+            background: #fef2f2;
+            color: #991b1b;
+        }
+
+        .proof-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 18px;
+        }
+
+        .proof-actions button {
+            flex: 1;
+            border: 0;
+            border-radius: 10px;
+            padding: 11px 12px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .proof-submit {
+            background: #111827;
+            color: white;
+        }
+
+        .proof-cancel {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .proof-status {
+            display: none;
+            margin-top: 12px;
+            padding: 11px 12px;
+            border-radius: 10px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .proof-status.error {
+            background: #fef2f2;
+            color: #991b1b;
+        }
+
+        @media (max-width: 700px) {
+            .proof-modal {
+                padding: 10px;
+            }
+
+            .proof-card {
+                border-radius: 18px;
+            }
+        }
+
+        /* --------------------------------------------------
            Empty / Loading / Error
         -------------------------------------------------- */
 
@@ -811,6 +970,97 @@
 
     </main>
 
+</div>
+
+<!-- =========================================================
+     RESOLUTION PROOF MODAL
+========================================================= -->
+
+<div
+    id="resolutionProofModal"
+    class="proof-modal"
+    onclick="closeResolutionProofModal(event)"
+>
+    <div
+        class="proof-card"
+        onclick="event.stopPropagation()"
+    >
+        <div class="proof-header">
+            <div>
+                <div class="proof-title">📸 Resolution Proof</div>
+                <div class="proof-subtitle">
+                    Upload an after-work photo/video. GPS is captured from the field device
+                    and the proof is sent to the AI verification queue.
+                </div>
+            </div>
+
+            <button
+                type="button"
+                class="proof-close"
+                onclick="closeResolutionProofModal()"
+            >
+                ×
+            </button>
+        </div>
+
+        <div class="proof-body">
+            <div class="proof-incident">
+                <div class="proof-label">Incident</div>
+                <div id="proofIncidentNumber" style="font-size:12px;font-weight:800;">—</div>
+                <div
+                    id="proofIncidentTitle"
+                    style="margin-top:4px;font-size:12px;color:#4b5563;"
+                >
+                    —
+                </div>
+                <input type="hidden" id="proofComplaintId">
+            </div>
+
+            <label class="proof-label" for="resolutionProofFile">
+                After-work photo / video
+            </label>
+
+            <input
+                id="resolutionProofFile"
+                class="proof-file"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/x-msvideo"
+                capture="environment"
+            >
+
+            <div class="proof-file-hint">
+                Supported: JPG, PNG, WEBP, MP4, MOV, AVI · Maximum 50 MB.
+            </div>
+
+            <div id="proofGpsStatus" class="proof-gps">
+                📍 Getting field GPS…
+            </div>
+
+            <div
+                id="proofUploadStatus"
+                class="proof-status"
+            ></div>
+
+            <div class="proof-actions">
+                <button
+                    type="button"
+                    class="proof-cancel"
+                    onclick="closeResolutionProofModal()"
+                >
+                    Cancel
+                </button>
+
+                <button
+                    type="button"
+                    id="submitProofButton"
+                    class="proof-submit"
+                    onclick="submitResolutionProof()"
+                >
+                    Upload Proof
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- =========================================================
@@ -1144,10 +1394,13 @@
     |--------------------------------------------------------------------------
     */
 
-    function getToken() {
-        return localStorage.getItem('smart_vadodara_token');
-    }
+    // function getToken() {
+    //     return localStorage.getItem('smart_vadodara_token');
+    // }
 
+    function getToken() {
+        return localStorage.getItem('smart_vadodara_field_token');
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -1423,12 +1676,9 @@
             actionHtml = `
                 <button
                     class="action"
-                    onclick="updateStatus(
-                        ${incident.complaints?.[0]?.id},
-                        'resolved'
-                    )"
+                    onclick="openResolutionProofModal(${incident.id})"
                 >
-                    Mark Resolved
+                    📸 Upload Resolution Proof
                 </button>
             `;
 
@@ -2375,13 +2625,10 @@
                     style="width:100%;"
                     onclick="
                         closeIncidentModal();
-                        updateStatus(
-                            ${firstComplaint.id},
-                            'resolved'
-                        );
+                        openResolutionProofModal(${incident.id});
                     "
                 >
-                    ✓ Mark Resolved
+                    📸 Upload Resolution Proof
                 </button>
             `;
 
@@ -2526,15 +2773,251 @@
 
     /*
     |--------------------------------------------------------------------------
+    | Resolution Proof
+    |--------------------------------------------------------------------------
+    */
+
+    let selectedProofIncident = null;
+    let proofLatitude = null;
+    let proofLongitude = null;
+    let proofAccuracy = null;
+
+    function openResolutionProofModal(incidentId) {
+        const incident =
+            dashboardData?.incidents
+                ?.find(item => item.id === incidentId);
+
+        if (!incident) {
+            showError('Unable to find the selected incident.');
+            return;
+        }
+
+        const complaint = incident.complaints?.[0];
+
+        if (!complaint?.id) {
+            showError('No complaint is available for this incident.');
+            return;
+        }
+
+        if ((incident.status || '').toLowerCase() !== 'in_progress') {
+            showError('Resolution proof can only be uploaded for an in-progress incident.');
+            return;
+        }
+
+        selectedProofIncident = incident;
+        proofLatitude = null;
+        proofLongitude = null;
+        proofAccuracy = null;
+
+        document.getElementById('proofComplaintId').value = complaint.id;
+        document.getElementById('proofIncidentNumber').textContent =
+            incident.incident_number || '—';
+        document.getElementById('proofIncidentTitle').textContent =
+            incident.title || incident.description || 'Civic Issue';
+
+        document.getElementById('resolutionProofFile').value = '';
+
+        const statusBox = document.getElementById('proofUploadStatus');
+        statusBox.style.display = 'none';
+        statusBox.className = 'proof-status';
+        statusBox.textContent = '';
+
+        const gpsBox = document.getElementById('proofGpsStatus');
+        gpsBox.className = 'proof-gps';
+        gpsBox.textContent = '📍 Getting field GPS…';
+
+        document.getElementById('submitProofButton').disabled = false;
+        document.getElementById('submitProofButton').textContent = 'Upload Proof';
+
+        const modal = document.getElementById('resolutionProofModal');
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+
+        captureProofLocation();
+    }
+
+    function closeResolutionProofModal(event) {
+        if (
+            event &&
+            event.target &&
+            event.target.id !== 'resolutionProofModal'
+        ) {
+            return;
+        }
+
+        const modal = document.getElementById('resolutionProofModal');
+
+        if (modal) {
+            modal.style.display = 'none';
+        }
+
+        document.body.style.overflow = '';
+        selectedProofIncident = null;
+    }
+
+    function captureProofLocation() {
+        const gpsBox = document.getElementById('proofGpsStatus');
+
+        if (!navigator.geolocation) {
+            gpsBox.className = 'proof-gps error';
+            gpsBox.textContent = '⚠ This device does not support GPS location.';
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                proofLatitude = Number(position.coords.latitude);
+                proofLongitude = Number(position.coords.longitude);
+                proofAccuracy = Number(position.coords.accuracy);
+
+                gpsBox.className = 'proof-gps';
+                gpsBox.textContent =
+                    `📍 GPS captured · ${proofLatitude.toFixed(6)}, ${proofLongitude.toFixed(6)} · ±${Math.round(proofAccuracy)}m`;
+            },
+            error => {
+                console.error('Resolution proof GPS error:', error);
+
+                gpsBox.className = 'proof-gps error';
+                gpsBox.textContent =
+                    '⚠ Unable to capture GPS. Please allow location access and try again.';
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 0
+            }
+        );
+    }
+
+    function setProofStatus(message, isError = false) {
+        const box = document.getElementById('proofUploadStatus');
+
+        box.textContent = message;
+        box.className =
+            `proof-status${isError ? ' error' : ''}`;
+        box.style.display = 'block';
+    }
+
+    async function submitResolutionProof() {
+        hideError();
+
+        const complaintId =
+            document.getElementById('proofComplaintId').value;
+
+        const fileInput =
+            document.getElementById('resolutionProofFile');
+
+        const file =
+            fileInput.files?.[0];
+
+        if (!complaintId) {
+            setProofStatus('No complaint is available for this incident.', true);
+            return;
+        }
+
+        if (!file) {
+            setProofStatus('Please select an after-work photo or video.', true);
+            return;
+        }
+
+        if (file.size > 50 * 1024 * 1024) {
+            setProofStatus('File size must not exceed 50 MB.', true);
+            return;
+        }
+
+        if (
+            !Number.isFinite(proofLatitude) ||
+            !Number.isFinite(proofLongitude)
+        ) {
+            setProofStatus(
+                'GPS location is required. Please allow location access and try again.',
+                true
+            );
+            captureProofLocation();
+            return;
+        }
+
+        const button =
+            document.getElementById('submitProofButton');
+
+        button.disabled = true;
+        button.textContent = 'Uploading…';
+
+        setProofStatus('Uploading resolution proof…');
+
+        try {
+            const formData = new FormData();
+
+            formData.append('type', file.type.startsWith('video/') ? 'video' : 'image');
+            formData.append('media', file);
+            formData.append('latitude', String(proofLatitude));
+            formData.append('longitude', String(proofLongitude));
+            formData.append('location_accuracy', String(proofAccuracy ?? ''));
+            formData.append('captured_at', new Date().toISOString());
+            formData.append(
+                'remarks',
+                'Resolution proof uploaded by field officer from dashboard.'
+            );
+
+            const response = await fetch(
+                `${API_BASE}/field/complaints/${encodeURIComponent(complaintId)}/resolution-proof`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: formData
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(
+                    data.message || 'Unable to upload resolution proof.'
+                );
+            }
+
+            setProofStatus(
+                '✓ Proof uploaded. AI verification is now pending.'
+            );
+
+            button.textContent = 'Uploaded ✓';
+
+            setTimeout(async () => {
+                closeResolutionProofModal();
+                await loadDashboard();
+            }, 900);
+
+        } catch (error) {
+            console.error('Resolution proof upload error:', error);
+            setProofStatus(error.message, true);
+
+            button.disabled = false;
+            button.textContent = 'Upload Proof';
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
     | Status update
     |--------------------------------------------------------------------------
     */
 
+    // async function updateStatus(
+    //     complaintId,
+    //     status
+    // ) {
+        
     async function updateStatus(
         complaintId,
         status
     ) {
 
+        hideError();
+        
         if (!complaintId) {
 
             showError(
@@ -2652,11 +3135,15 @@
         }
 
         localStorage.removeItem(
-            'smart_vadodara_token'
+            'smart_vadodara_field_token'
+        );
+
+        localStorage.removeItem(
+            'smart_vadodara_field_user'
         );
 
         window.location.href =
-            '/citizen';
+            '/field/login';
 
     }
 

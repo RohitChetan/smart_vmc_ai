@@ -616,95 +616,172 @@ if (storedUser) {
 //     `;
 // }
 
-//update code 
-    async function loadDashboard() {
+async function loadDashboard() {
 
-        const complaintsList =
-            document.getElementById('complaintsList');
+    const complaintsList =
+        document.getElementById('complaintsList');
 
-        try {
+    /*
+    |--------------------------------------------------------------------------
+    | Load Civic Points
+    |--------------------------------------------------------------------------
+    */
 
-            const response = await fetch('/api/citizen/complaints', {
+    try {
+
+        const rewardResponse = await fetch(
+            '/api/citizen/rewards',
+            {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
                     'Authorization': 'Bearer ' + token
                 }
-            });
+            }
+        );
 
-            const data = await response.json();
+        const rewardData =
+            await rewardResponse.json();
 
-            if (!response.ok || !data.success) {
-                throw new Error(
-                    data.message || 'Unable to load complaints.'
+        if (
+            rewardResponse.ok &&
+            rewardData.success
+        ) {
+
+            const points =
+                Number(
+                    rewardData.reward?.total_points || 0
                 );
+
+            const pointsCount =
+                document.getElementById('pointsCount');
+
+            if (pointsCount) {
+                pointsCount.textContent = points;
             }
+        }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Summary
-            |--------------------------------------------------------------------------
-            */
+    } catch (rewardError) {
 
-            document.getElementById('totalCount').textContent =
-                data.summary.total;
-
-            document.getElementById('activeCount').textContent =
-                data.summary.active;
-
-            document.getElementById('resolvedCount').textContent =
-                data.summary.resolved;
+        console.error(
+            'Citizen rewards error:',
+            rewardError
+        );
+    }
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | Complaints
-            |--------------------------------------------------------------------------
-            */
+    /*
+    |--------------------------------------------------------------------------
+    | Load Citizen Complaints
+    |--------------------------------------------------------------------------
+    */
 
-            const complaints = data.complaints || [];
+    try {
 
-            if (!complaints.length) {
+        const response = await fetch(
+            '/api/citizen/complaints',
+            {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                }
+            }
+        );
 
-                complaintsList.innerHTML = `
-                    <div class="empty">
+        const data =
+            await response.json();
 
-                        <div class="empty-icon">
-                            📋
-                        </div>
+        if (
+            !response.ok ||
+            !data.success
+        ) {
 
-                        <div style="font-weight:700; margin-bottom:5px;">
-                            No complaints yet
-                        </div>
+            throw new Error(
+                data.message ||
+                'Unable to load complaints.'
+            );
+        }
 
-                        <div>
-                            Report your first civic issue to get started.
-                        </div>
 
+        /*
+        |--------------------------------------------------------------------------
+        | Summary
+        |--------------------------------------------------------------------------
+        */
+
+        document.getElementById('totalCount').textContent =
+            data.summary.total;
+
+        document.getElementById('activeCount').textContent =
+            data.summary.active;
+
+        document.getElementById('resolvedCount').textContent =
+            data.summary.resolved;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Complaints
+        |--------------------------------------------------------------------------
+        */
+
+        const complaints =
+            data.complaints || [];
+
+
+        if (!complaints.length) {
+
+            complaintsList.innerHTML = `
+                <div class="empty">
+
+                    <div class="empty-icon">
+                        📋
                     </div>
-                `;
 
-                return;
-            }
+                    <div style="
+                        font-weight:700;
+                        margin-bottom:5px;
+                    ">
+                        No complaints yet
+                    </div>
+
+                    <div>
+                        Report your first civic issue
+                        to get started.
+                    </div>
+
+                </div>
+            `;
+
+            return;
+        }
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | Show latest 5
-            |--------------------------------------------------------------------------
-            */
+        /*
+        |--------------------------------------------------------------------------
+        | Show latest 5 complaints
+        |--------------------------------------------------------------------------
+        */
 
-            complaintsList.innerHTML =
-                complaints.slice(0, 5).map(complaint => {
+        complaintsList.innerHTML =
+            complaints
+                .slice(0, 5)
+                .map(complaint => {
 
                     const statusClass =
-                        getStatusClass(complaint.status);
+                        getStatusClass(
+                            complaint.status
+                        );
 
                     const statusLabel =
-                        formatStatus(complaint.status);
+                        formatStatus(
+                            complaint.status
+                        );
 
                     const category =
-                        complaint.category || 'Civic Issue';
+                        complaint.category ||
+                        'Civic Issue';
 
                     const ward =
                         complaint.ward
@@ -712,7 +789,9 @@ if (storedUser) {
                             : 'Ward pending';
 
                     const date =
-                        formatDate(complaint.submitted_at);
+                        formatDate(
+                            complaint.submitted_at
+                        );
 
                     return `
                         <div
@@ -724,7 +803,9 @@ if (storedUser) {
                             <div class="complaint-left">
 
                                 <div class="complaint-number">
-                                    ${escapeHtml(complaint.complaint_number)}
+                                    ${escapeHtml(
+                                        complaint.complaint_number
+                                    )}
                                 </div>
 
                                 <div class="complaint-title">
@@ -732,11 +813,24 @@ if (storedUser) {
                                 </div>
 
                                 <div class="complaint-meta">
+
                                     ${escapeHtml(ward)}
-                                    ${date ? ' • ' + date : ''}
-                                    ${complaint.department
-                                        ? ' • ' + escapeHtml(complaint.department)
-                                        : ''}
+
+                                    ${
+                                        date
+                                            ? ' • ' + date
+                                            : ''
+                                    }
+
+                                    ${
+                                        complaint.department
+                                            ? ' • ' +
+                                              escapeHtml(
+                                                  complaint.department
+                                              )
+                                            : ''
+                                    }
+
                                 </div>
 
                             </div>
@@ -748,36 +842,41 @@ if (storedUser) {
                         </div>
                     `;
 
-                }).join('');
+                })
+                .join('');
 
 
-        } catch (error) {
+    } catch (error) {
 
-            console.error(
-                'Citizen dashboard error:',
-                error
-            );
+        console.error(
+            'Citizen dashboard error:',
+            error
+        );
 
-            complaintsList.innerHTML = `
-                <div class="empty">
+        complaintsList.innerHTML = `
+            <div class="empty">
 
-                    <div class="empty-icon">
-                        ⚠️
-                    </div>
-
-                    <div style="font-weight:700; margin-bottom:5px;">
-                        Unable to load complaints
-                    </div>
-
-                    <div>
-                        Please refresh the page and try again.
-                    </div>
-
+                <div class="empty-icon">
+                    ⚠️
                 </div>
-            `;
-        }
-    }
 
+                <div style="
+                    font-weight:700;
+                    margin-bottom:5px;
+                ">
+                    Unable to load complaints
+                </div>
+
+                <div>
+                    Please refresh the page and try again.
+                </div>
+
+            </div>
+        `;
+    }
+}
+
+    
 
 /*
 |--------------------------------------------------------------------------
@@ -920,14 +1019,1354 @@ async function logout() {
 |--------------------------------------------------------------------------
 */
 
-function showPoints() {
+// async function showPoints() {
+//     const token = localStorage.getItem('smart_vadodara_token');
 
-    alert(
-        'Civic Points system will be available soon.'
-    );
+//     if (!token) {
+//         window.location.href = '/citizen/login';
+//         return;
+//     }
 
+//     try {
+//         // Get reward data
+//         const response = await fetch('/api/citizen/rewards', {
+//             method: 'GET',
+//             headers: {
+//                 'Accept': 'application/json',
+//                 'Authorization': `Bearer ${token}`,
+//             },
+//         });
+
+//         const data = await response.json();
+
+//         if (!response.ok || !data.success) {
+//             throw new Error(data.message || 'Unable to load civic points.');
+//         }
+
+//         const points = Number(data.reward?.total_points || 0);
+//         const level = data.reward?.level || 'Citizen';
+
+//         // Update dashboard points number
+//         const pointsCount = document.getElementById('pointsCount');
+
+//         if (pointsCount) {
+//             pointsCount.textContent = points;
+//         }
+
+//         // Get certificates
+//         const certificatesResponse = await fetch(
+//             '/api/citizen/certificates',
+//             {
+//                 method: 'GET',
+//                 headers: {
+//                     'Accept': 'application/json',
+//                     'Authorization': `Bearer ${token}`,
+//                 },
+//             }
+//         );
+
+//         const certificates = certificatesData.success
+//             ? (certificatesData.certificates || [])
+//             : [];
+
+//         window.citizenCertificates = certificates;
+
+//         let certificatesHTML = '';
+
+//         if (certificates.length > 0) {
+
+//             certificatesHTML = certificates.map(certificate => {
+
+//                 const issuedDate = certificate.issued_at
+//                     ? new Date(certificate.issued_at)
+//                         .toLocaleDateString('en-IN')
+//                     : '-';
+
+//                 return `
+//                     <div style="
+//                         margin-top:16px;
+//                         padding:16px;
+//                         border:1px solid #e5e7eb;
+//                         border-radius:16px;
+//                         background:#ffffff;
+//                     ">
+
+//                         <div style="
+//                             display:flex;
+//                             align-items:flex-start;
+//                             justify-content:space-between;
+//                             gap:12px;
+//                         ">
+
+//                             <div>
+//                                 <div style="
+//                                     font-size:14px;
+//                                     font-weight:700;
+//                                     color:#111827;
+//                                 ">
+//                                     🏆 ${certificate.title || 'Jagruk Nagrik Certificate'}
+//                                 </div>
+
+//                                 <div style="
+//                                     margin-top:5px;
+//                                     font-size:12px;
+//                                     color:#6b7280;
+//                                 ">
+//                                     ${certificate.certificate_number || ''}
+//                                 </div>
+//                             </div>
+
+//                             <span style="
+//                                 flex-shrink:0;
+//                                 padding:5px 10px;
+//                                 border-radius:999px;
+//                                 background:#dcfce7;
+//                                 color:#15803d;
+//                                 font-size:11px;
+//                                 font-weight:700;
+//                             ">
+//                                 Issued
+//                             </span>
+
+//                         </div>
+
+//                         <div style="
+//                             margin-top:12px;
+//                             font-size:12px;
+//                             color:#6b7280;
+//                         ">
+//                             Issued on: ${issuedDate}
+//                         </div>
+
+//                         <button
+//                             type="button"
+//                             onclick="viewCertificate(${certificate.id})"
+//                             style="
+//                                 margin-top:14px;
+//                                 width:100%;
+//                                 padding:11px 16px;
+//                                 border:1px solid #2563eb;
+//                                 border-radius:12px;
+//                                 background:#ffffff;
+//                                 color:#2563eb;
+//                                 font-size:13px;
+//                                 font-weight:600;
+//                                 cursor:pointer;
+//                             "
+//                         >
+//                             View Certificate
+//                         </button>
+
+//                     </div>
+//                 `;
+
+//             }).join('');
+
+//         } else {
+
+//             certificatesHTML = `
+//                 <div style="
+//                     margin-top:16px;
+//                     padding:24px 16px;
+//                     text-align:center;
+//                     border:1px dashed #d1d5db;
+//                     border-radius:16px;
+//                     background:#ffffff;
+//                 ">
+//                     <div style="font-size:36px;">
+//                         🏆
+//                     </div>
+
+//                     <div style="
+//                         margin-top:8px;
+//                         font-size:14px;
+//                         font-weight:700;
+//                         color:#1f2937;
+//                     ">
+//                         No certificates yet
+//                     </div>
+
+//                     <div style="
+//                         margin-top:5px;
+//                         font-size:12px;
+//                         line-height:1.5;
+//                         color:#6b7280;
+//                     ">
+//                         Confirm a successfully resolved civic complaint
+//                         to earn your first certificate.
+//                     </div>
+//                 </div>
+//             `;
+//         }
+
+//         // Remove existing modal
+//         const oldModal = document.getElementById('pointsModal');
+
+//         if (oldModal) {
+//             oldModal.remove();
+//         }
+
+//         // Create modal
+//         const modal = document.createElement('div');
+
+//         modal.id = 'pointsModal';
+
+//         modal.style.cssText = `
+//             position:fixed;
+//             inset:0;
+//             z-index:999999;
+//             display:flex;
+//             align-items:center;
+//             justify-content:center;
+//             padding:20px;
+//             background:rgba(15,23,42,0.55);
+//             backdrop-filter:blur(4px);
+//         `;
+
+//         modal.innerHTML = `
+//             <div
+//                 style="
+//                     width:100%;
+//                     max-width:460px;
+//                     max-height:90vh;
+//                     overflow-y:auto;
+//                     background:#f8fafc;
+//                     border-radius:28px;
+//                     padding:24px;
+//                     box-shadow:0 25px 60px rgba(0,0,0,0.25);
+//                 "
+//             >
+
+//                 <!-- Header -->
+//                 <div style="
+//                     display:flex;
+//                     align-items:center;
+//                     justify-content:space-between;
+//                 ">
+
+//                     <div>
+//                         <div style="
+//                             font-size:11px;
+//                             font-weight:700;
+//                             letter-spacing:0.08em;
+//                             text-transform:uppercase;
+//                             color:#94a3b8;
+//                         ">
+//                             Smart Vadodara
+//                         </div>
+
+//                         <div style="
+//                             margin-top:3px;
+//                             font-size:22px;
+//                             line-height:1.2;
+//                             font-weight:800;
+//                             color:#172033;
+//                         ">
+//                             Civic Points
+//                         </div>
+//                     </div>
+
+//                     <button
+//                         type="button"
+//                         id="closePointsModal"
+//                         style="
+//                             width:38px;
+//                             height:38px;
+//                             border:0;
+//                             border-radius:50%;
+//                             background:#e2e8f0;
+//                             color:#475569;
+//                             font-size:18px;
+//                             cursor:pointer;
+//                         "
+//                     >
+//                         ×
+//                     </button>
+
+//                 </div>
+
+//                 <!-- Points Card -->
+//                 <div style="
+//                     margin-top:20px;
+//                     padding:26px;
+//                     border-radius:24px;
+//                     background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);
+//                     color:white;
+//                     box-shadow:0 12px 30px rgba(37,99,235,0.25);
+//                 ">
+
+//                     <div style="
+//                         font-size:13px;
+//                         font-weight:500;
+//                         opacity:0.85;
+//                     ">
+//                         Your Civic Points
+//                     </div>
+
+//                     <div style="
+//                         margin-top:7px;
+//                         display:flex;
+//                         align-items:flex-end;
+//                         gap:8px;
+//                     ">
+
+//                         <span style="
+//                             font-size:52px;
+//                             line-height:1;
+//                             font-weight:800;
+//                         ">
+//                             ${points}
+//                         </span>
+
+//                         <span style="
+//                             padding-bottom:5px;
+//                             font-size:13px;
+//                             opacity:0.85;
+//                         ">
+//                             points
+//                         </span>
+
+//                     </div>
+
+//                     <div style="
+//                         display:inline-block;
+//                         margin-top:18px;
+//                         padding:6px 14px;
+//                         border-radius:999px;
+//                         background:rgba(255,255,255,0.18);
+//                         font-size:12px;
+//                         font-weight:700;
+//                     ">
+//                         Level: ${level}
+//                     </div>
+
+//                 </div>
+
+//                 <!-- Certificates -->
+//                 <div style="
+//                     margin-top:24px;
+//                     font-size:15px;
+//                     font-weight:800;
+//                     color:#172033;
+//                 ">
+//                     🏅 Your Certificates
+//                 </div>
+
+//                 ${certificatesHTML}
+
+//             </div>
+//         `;
+
+//         document.body.appendChild(modal);
+
+//         // Close button
+//         document.getElementById('closePointsModal').onclick = () => {
+//             modal.remove();
+//         };
+
+//         // Click outside
+//         modal.addEventListener('click', function(event) {
+//             if (event.target === modal) {
+//                 modal.remove();
+//             }
+//         });
+
+//     } catch (error) {
+
+//         console.error('Civic Points Error:', error);
+
+//         alert(
+//             error.message ||
+//             'Unable to load Civic Points.'
+//         );
+//     }
+// }
+
+async function showPoints() {
+    const token = localStorage.getItem('smart_vadodara_token');
+
+    if (!token) {
+        window.location.href = '/citizen/login';
+        return;
+    }
+
+    try {
+        // -----------------------------
+        // Load Civic Points
+        // -----------------------------
+        const rewardResponse = await fetch('/api/citizen/rewards', {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+
+        const rewardData = await rewardResponse.json();
+
+        if (!rewardResponse.ok || !rewardData.success) {
+            throw new Error(
+                rewardData.message || 'Unable to load civic points.'
+            );
+        }
+
+        const points = Number(
+            rewardData.reward?.total_points || 0
+        );
+
+        const level =
+            rewardData.reward?.level || 'Citizen';
+
+        // Update dashboard card
+        const pointsCount =
+            document.getElementById('pointsCount');
+
+        if (pointsCount) {
+            pointsCount.textContent = points;
+        }
+
+        // -----------------------------
+        // Load Certificates
+        // -----------------------------
+        const certificateResponse = await fetch(
+            '/api/citizen/certificates',
+            {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+            }
+        );
+
+        const certificateData =
+            await certificateResponse.json();
+
+        if (
+            !certificateResponse.ok ||
+            !certificateData.success
+        ) {
+            throw new Error(
+                certificateData.message ||
+                'Unable to load certificates.'
+            );
+        }
+
+        const certificates =
+            certificateData.certificates || [];
+
+        // Store globally for View Certificate
+        window.citizenCertificates = certificates;
+
+        // -----------------------------
+        // Certificate HTML
+        // -----------------------------
+        let certificatesHTML = '';
+
+        if (certificates.length > 0) {
+
+            certificatesHTML = certificates.map(
+                certificate => {
+
+                    const issuedDate =
+                        certificate.issued_at
+                            ? new Date(
+                                certificate.issued_at
+                            ).toLocaleDateString('en-IN')
+                            : '-';
+
+                    return `
+                        <div style="
+                            margin-top:16px;
+                            padding:16px;
+                            border:1px solid #e5e7eb;
+                            border-radius:16px;
+                            background:#ffffff;
+                        ">
+
+                            <div style="
+                                display:flex;
+                                align-items:flex-start;
+                                justify-content:space-between;
+                                gap:12px;
+                            ">
+
+                                <div>
+                                    <div style="
+                                        font-size:14px;
+                                        font-weight:700;
+                                        color:#111827;
+                                    ">
+                                        🏆 ${
+                                            certificate.title ||
+                                            '"Jagruk Nagrik Certificate"'
+                                        }
+                                    </div>
+
+                                    <div style="
+                                        margin-top:5px;
+                                        font-size:12px;
+                                        color:#6b7280;
+                                    ">
+                                        ${
+                                            certificate.certificate_number ||
+                                            ''
+                                        }
+                                    </div>
+                                </div>
+
+                                <span style="
+                                    flex-shrink:0;
+                                    padding:5px 10px;
+                                    border-radius:999px;
+                                    background:#dcfce7;
+                                    color:#15803d;
+                                    font-size:11px;
+                                    font-weight:700;
+                                ">
+                                    Issued
+                                </span>
+
+                            </div>
+
+                            <div style="
+                                margin-top:12px;
+                                font-size:12px;
+                                color:#6b7280;
+                            ">
+                                Issued on: ${issuedDate}
+                            </div>
+
+                            <button
+                                type="button"
+                                onclick="viewCertificate(${certificate.id})"
+                                style="
+                                    margin-top:14px;
+                                    width:100%;
+                                    padding:11px 16px;
+                                    border:1px solid #2563eb;
+                                    border-radius:12px;
+                                    background:#ffffff;
+                                    color:#2563eb;
+                                    font-size:13px;
+                                    font-weight:700;
+                                    cursor:pointer;
+                                "
+                            >
+                                View Certificate
+                            </button>
+
+                        </div>
+                    `;
+                }
+            ).join('');
+
+        } else {
+
+            certificatesHTML = `
+                <div style="
+                    margin-top:16px;
+                    padding:24px 16px;
+                    text-align:center;
+                    border:1px dashed #d1d5db;
+                    border-radius:16px;
+                    background:#ffffff;
+                ">
+
+                    <div style="font-size:36px;">
+                        🏆
+                    </div>
+
+                    <div style="
+                        margin-top:8px;
+                        font-size:14px;
+                        font-weight:700;
+                        color:#1f2937;
+                    ">
+                        No certificates yet
+                    </div>
+
+                    <div style="
+                        margin-top:5px;
+                        font-size:12px;
+                        line-height:1.5;
+                        color:#6b7280;
+                    ">
+                        Confirm a successfully resolved civic
+                        complaint to earn your first certificate.
+                    </div>
+
+                </div>
+            `;
+        }
+
+        // -----------------------------
+        // Remove old modal
+        // -----------------------------
+        document.getElementById(
+            'pointsModal'
+        )?.remove();
+
+        // -----------------------------
+        // Create Modal
+        // -----------------------------
+        const modal =
+            document.createElement('div');
+
+        modal.id = 'pointsModal';
+
+        modal.style.cssText = `
+            position:fixed;
+            inset:0;
+            z-index:999999;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            padding:20px;
+            background:rgba(15,23,42,.65);
+            backdrop-filter:blur(5px);
+        `;
+
+        modal.innerHTML = `
+            <div style="
+                width:100%;
+                max-width:460px;
+                max-height:90vh;
+                overflow-y:auto;
+                background:#f8fafc;
+                border-radius:28px;
+                padding:24px;
+                box-shadow:0 25px 60px rgba(0,0,0,.25);
+            ">
+
+                <!-- Header -->
+                <div style="
+                    display:flex;
+                    align-items:center;
+                    justify-content:space-between;
+                ">
+
+                    <div>
+                        <div style="
+                            font-size:11px;
+                            font-weight:700;
+                            letter-spacing:.08em;
+                            text-transform:uppercase;
+                            color:#94a3b8;
+                        ">
+                            Smart Vadodara
+                        </div>
+
+                        <div style="
+                            margin-top:3px;
+                            font-size:22px;
+                            font-weight:800;
+                            color:#172033;
+                        ">
+                            Civic Points
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        id="closePointsModal"
+                        style="
+                            width:38px;
+                            height:38px;
+                            border:0;
+                            border-radius:50%;
+                            background:#e2e8f0;
+                            color:#475569;
+                            font-size:20px;
+                            font-weight:700;
+                            cursor:pointer;
+                        "
+                    >
+                        ×
+                    </button>
+
+                </div>
+
+                <!-- Points -->
+                <div style="
+                    margin-top:20px;
+                    padding:26px;
+                    border-radius:24px;
+                    background:linear-gradient(
+                        135deg,
+                        #2563eb 0%,
+                        #1d4ed8 100%
+                    );
+                    color:white;
+                    box-shadow:
+                        0 12px 30px
+                        rgba(37,99,235,.25);
+                ">
+
+                    <div style="
+                        font-size:13px;
+                        opacity:.85;
+                    ">
+                        Your Civic Points
+                    </div>
+
+                    <div style="
+                        margin-top:7px;
+                        display:flex;
+                        align-items:flex-end;
+                        gap:8px;
+                    ">
+
+                        <span style="
+                            font-size:52px;
+                            line-height:1;
+                            font-weight:800;
+                        ">
+                            ${points}
+                        </span>
+
+                        <span style="
+                            padding-bottom:5px;
+                            font-size:13px;
+                            opacity:.85;
+                        ">
+                            points
+                        </span>
+
+                    </div>
+
+                    <div style="
+                        display:inline-block;
+                        margin-top:18px;
+                        padding:6px 14px;
+                        border-radius:999px;
+                        background:rgba(255,255,255,.18);
+                        font-size:12px;
+                        font-weight:700;
+                    ">
+                        Level: ${level}
+                    </div>
+
+                </div>
+
+                <!-- Certificates -->
+                <div style="
+                    margin-top:24px;
+                    font-size:15px;
+                    font-weight:800;
+                    color:#172033;
+                ">
+                    🏅 Your Certificates
+                </div>
+
+                ${certificatesHTML}
+
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Close
+        document.getElementById(
+            'closePointsModal'
+        ).onclick = () => {
+            modal.remove();
+        };
+
+        // Click outside
+        modal.addEventListener(
+            'click',
+            function(event) {
+                if (event.target === modal) {
+                    modal.remove();
+                }
+            }
+        );
+
+    } catch (error) {
+
+        console.error(
+            'Civic Points Error:',
+            error
+        );
+
+        alert(
+            error.message ||
+            'Unable to load Civic Points.'
+        );
+    }
 }
 
+function viewCertificate(certificateId) {
+
+    const certificates = window.citizenCertificates || [];
+
+    const certificate = certificates.find(
+        item => Number(item.id) === Number(certificateId)
+    );
+
+    if (!certificate) {
+        alert('Certificate not found.');
+        return;
+    }
+
+    const user = JSON.parse(
+        localStorage.getItem('smart_vadodara_user') || '{}'
+    );
+
+    const citizenName = user.name || 'Citizen';
+
+    const issuedDate = certificate.issued_at
+        ? new Date(certificate.issued_at).toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric'
+        })
+        : '-';
+
+    const complaintNumber =
+        certificate.complaint_number ||
+        certificate.complaint?.complaint_number ||
+        '-';
+
+    const category =
+        certificate.category ||
+        certificate.complaint?.ai_category?.name ||
+        certificate.complaint?.category?.name ||
+        'Civic Issue';
+
+    const ward =
+        certificate.ward_name ||
+        certificate.complaint?.ward?.name ||
+        (certificate.ward_id
+            ? `Ward ${certificate.ward_id}`
+            : 'Vadodara');
+
+    // Remove points modal
+    document.getElementById('pointsModal')?.remove();
+
+    // Remove existing certificate modal
+    document.getElementById('certificateModal')?.remove();
+
+    const modal = document.createElement('div');
+
+    modal.id = 'certificateModal';
+
+    modal.style.cssText = `
+        position:fixed;
+        inset:0;
+        z-index:999999;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        padding:20px;
+        background:rgba(15,23,42,0.65);
+        backdrop-filter:blur(5px);
+        overflow-y:auto;
+    `;
+
+    modal.innerHTML = `
+        <div
+            id="certificatePrintable"
+            style="
+                width:100%;
+                max-width:850px;
+                max-height:92vh;
+                overflow-y:auto;
+                background:#ffffff;
+                border-radius:20px;
+                box-shadow:0 30px 80px rgba(0,0,0,.3);
+            "
+        >
+
+            <!-- Certificate -->
+            <div
+                style="
+                    margin:18px;
+                    padding:48px 45px;
+                    min-height:600px;
+                    border:10px solid #2563eb;
+                    border-radius:12px;
+                    position:relative;
+                    background:
+                        radial-gradient(
+                            circle at top right,
+                            rgba(37,99,235,.08),
+                            transparent 35%
+                        ),
+                        #ffffff;
+                    text-align:center;
+                    box-sizing:border-box;
+                "
+            >
+
+                <!-- Inner Border -->
+                <div
+                    style="
+                        position:absolute;
+                        inset:12px;
+                        border:2px solid #bfdbfe;
+                        border-radius:6px;
+                        pointer-events:none;
+                    "
+                ></div>
+
+                <!-- Content -->
+                <div style="position:relative;z-index:2;">
+
+                    <!-- Logo -->
+                    <div
+                        style="
+                            width:64px;
+                            height:64px;
+                            margin:0 auto;
+                            border-radius:18px;
+                            background:#2563eb;
+                            color:white;
+                            display:flex;
+                            align-items:center;
+                            justify-content:center;
+                            font-size:22px;
+                            font-weight:800;
+                            box-shadow:0 8px 20px rgba(37,99,235,.25);
+                        "
+                    >
+                        SV
+                    </div>
+
+                    <div
+                        style="
+                            margin-top:12px;
+                            font-size:12px;
+                            font-weight:800;
+                            letter-spacing:.18em;
+                            color:#64748b;
+                        "
+                    >
+                        SMART VADODARA
+                    </div>
+
+                    <div
+                        style="
+                            margin-top:30px;
+                            font-size:14px;
+                            font-weight:700;
+                            letter-spacing:.22em;
+                            color:#2563eb;
+                        "
+                    >
+                        CERTIFICATE OF APPRECIATION
+                    </div>
+
+                    <div
+                        style="
+                            margin-top:12px;
+                            font-size:42px;
+                            line-height:1.15;
+                            font-family:Georgia,serif;
+                            font-weight:700;
+                            color:#172033;
+                        "
+                    >
+                        🏆
+                    </div>
+
+                    <div
+                        style="
+                            margin-top:8px;
+                            font-size:30px;
+                            font-family:Georgia,serif;
+                            font-weight:700;
+                            color:#172033;
+                        "
+                    >
+                        Jagruk Nagrik
+                    </div>
+
+                    <div
+                        style="
+                            margin-top:8px;
+                            font-size:13px;
+                            color:#64748b;
+                        "
+                    >
+                        This certificate is proudly presented to
+                    </div>
+
+                    <!-- Citizen Name -->
+                    <div
+                        style="
+                            margin-top:18px;
+                            font-size:30px;
+                            font-family:Georgia,serif;
+                            font-weight:700;
+                            color:#2563eb;
+                        "
+                    >
+                        ${escapeHtml(citizenName)}
+                    </div>
+
+                    <div
+                        style="
+                            width:280px;
+                            height:1px;
+                            margin:10px auto 0;
+                            background:#cbd5e1;
+                        "
+                    ></div>
+
+                    <div
+                        style="
+                            max-width:580px;
+                            margin:24px auto 0;
+                            font-size:14px;
+                            line-height:1.7;
+                            color:#475569;
+                        "
+                    >
+                        In recognition of your active participation
+                        in reporting civic issues and contributing
+                        towards a cleaner, safer and smarter Vadodara.
+                    </div>
+
+                    <!-- Complaint Details -->
+                    <div
+                        style="
+                            max-width:580px;
+                            margin:28px auto 0;
+                            padding:18px;
+                            border-radius:12px;
+                            background:#f8fafc;
+                            border:1px solid #e2e8f0;
+                            text-align:left;
+                        "
+                    >
+
+                        <div
+                            style="
+                                display:grid;
+                                grid-template-columns:1fr 1fr;
+                                gap:16px;
+                            "
+                        >
+
+                            <div>
+                                <div style="
+                                    font-size:10px;
+                                    font-weight:700;
+                                    text-transform:uppercase;
+                                    color:#94a3b8;
+                                ">
+                                    Certificate Number
+                                </div>
+
+                                <div style="
+                                    margin-top:4px;
+                                    font-size:12px;
+                                    font-weight:700;
+                                    color:#172033;
+                                ">
+                                    ${escapeHtml(
+                                        certificate.certificate_number || '-'
+                                    )}
+                                </div>
+                            </div>
+
+                            <div>
+                                <div style="
+                                    font-size:10px;
+                                    font-weight:700;
+                                    text-transform:uppercase;
+                                    color:#94a3b8;
+                                ">
+                                    Issue Date
+                                </div>
+
+                                <div style="
+                                    margin-top:4px;
+                                    font-size:12px;
+                                    font-weight:700;
+                                    color:#172033;
+                                ">
+                                    ${issuedDate}
+                                </div>
+                            </div>
+
+                            <div>
+                                <div style="
+                                    font-size:10px;
+                                    font-weight:700;
+                                    text-transform:uppercase;
+                                    color:#94a3b8;
+                                ">
+                                    Complaint
+                                </div>
+
+                                <div style="
+                                    margin-top:4px;
+                                    font-size:12px;
+                                    font-weight:700;
+                                    color:#172033;
+                                ">
+                                    ${escapeHtml(complaintNumber)}
+                                </div>
+                            </div>
+
+                            <div>
+                                <div style="
+                                    font-size:10px;
+                                    font-weight:700;
+                                    text-transform:uppercase;
+                                    color:#94a3b8;
+                                ">
+                                    Ward
+                                </div>
+
+                                <div style="
+                                    margin-top:4px;
+                                    font-size:12px;
+                                    font-weight:700;
+                                    color:#172033;
+                                ">
+                                    ${escapeHtml(ward)}
+                                </div>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <!-- Footer -->
+                    <div
+                        style="
+                            margin-top:30px;
+                            display:flex;
+                            justify-content:space-between;
+                            align-items:flex-end;
+                            text-align:left;
+                        "
+                    >
+
+                        <div>
+                            <div style="
+                                width:130px;
+                                border-top:1px solid #94a3b8;
+                            "></div>
+
+                            <div style="
+                                margin-top:6px;
+                                font-size:10px;
+                                color:#64748b;
+                            ">
+                                Smart Vadodara
+                            </div>
+                        </div>
+
+                        <div style="
+                            text-align:right;
+                        ">
+                            <div style="
+                                font-size:10px;
+                                color:#94a3b8;
+                            ">
+                                Verified Civic Contribution
+                            </div>
+
+                            <div style="
+                                margin-top:4px;
+                                font-size:12px;
+                                font-weight:700;
+                                color:#2563eb;
+                            ">
+                                Smart Vadodara Connect
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Actions -->
+            <div
+                class="certificate-actions"
+                style="
+                    display:flex;
+                    gap:12px;
+                    padding:0 24px 24px;
+                "
+            >
+
+                <button
+                    type="button"
+                    id="closeCertificate"
+                    style="
+                        flex:1;
+                        padding:13px 18px;
+                        border:1px solid #d1d5db;
+                        border-radius:12px;
+                        background:#ffffff;
+                        color:#475569;
+                        font-size:14px;
+                        font-weight:700;
+                        cursor:pointer;
+                    "
+                >
+                    Close
+                </button>
+
+                <button
+                    type="button"
+                    id="printCertificate"
+                    style="
+                        flex:1;
+                        padding:13px 18px;
+                        border:0;
+                        border-radius:12px;
+                        background:#2563eb;
+                        color:#ffffff;
+                        font-size:14px;
+                        font-weight:700;
+                        cursor:pointer;
+                    "
+                >
+                    🖨️ Print Certificate
+                </button>
+
+            </div>
+
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    document.getElementById('closeCertificate').onclick = () => {
+        modal.remove();
+    };
+
+    modal.addEventListener('click', function(event) {
+        if (event.target === modal) {
+            modal.remove();
+        }
+    });
+
+    document.getElementById('printCertificate').onclick = () => {
+        printCertificate();
+    };
+}
+
+function escapeHtml(value) {
+
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function printCertificate() {
+
+    const certificate = document.getElementById(
+        'certificatePrintable'
+    );
+
+    if (!certificate) {
+        return;
+    }
+
+    const printWindow = window.open(
+        '',
+        '_blank',
+        'width=1100,height=800'
+    );
+
+    if (!printWindow) {
+        alert('Please allow popups to print the certificate.');
+        return;
+    }
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+
+            <title>Smart Vadodara Certificate</title>
+
+            <style>
+
+                * {
+                    box-sizing:border-box;
+                }
+
+                html,
+                body {
+                    margin:0;
+                    padding:0;
+                    background:#ffffff;
+                }
+
+                body {
+                    font-family:
+                        Arial,
+                        Helvetica,
+                        sans-serif;
+                }
+
+                #certificatePrintable {
+                    width:100%;
+                    max-width:100%;
+                    background:#ffffff;
+                }
+
+                .certificate-actions {
+                    display:none !important;
+                }
+
+                @page {
+                    size:A4 landscape;
+                    margin:8mm;
+                }
+
+                @media print {
+
+                    body {
+                        width:100%;
+                    }
+
+                    #certificatePrintable {
+                        width:100%;
+                    }
+
+                }
+
+            </style>
+
+        </head>
+
+        <body>
+
+            ${certificate.outerHTML}
+
+            <script>
+                window.onload = function() {
+                    setTimeout(function() {
+                        window.print();
+                    }, 300);
+                };
+
+                window.onafterprint = function() {
+                    window.close();
+                };
+            <\/script>
+
+        </body>
+        </html>
+    `);
+
+    printWindow.document.close();
+}
 
 loadDashboard();
 

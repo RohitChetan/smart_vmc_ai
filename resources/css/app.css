@@ -7,3 +7,154 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+
+/* Dynamic Citizen Points modal */
+.civic-points-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.civic-points-card {
+    width: 100%;
+    max-width: 448px;
+    background: #fff;
+    padding: 24px;
+    border-radius: 28px 28px 0 0;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+}
+
+.civic-points-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.civic-points-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #9ca3af;
+}
+
+.civic-points-title {
+    margin-top: 4px;
+    font-size: 20px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.civic-points-close {
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 999px;
+    background: #f3f4f6;
+    color: #4b5563;
+    cursor: pointer;
+}
+
+.civic-points-box {
+    margin-top: 20px;
+    padding: 24px;
+    border-radius: 24px;
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
+    color: white;
+}
+
+.civic-points-caption {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+.civic-points-number {
+    margin-top: 2px;
+    font-size: 48px;
+    line-height: 1;
+    font-weight: 700;
+}
+
+.civic-points-level {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.2);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.civic-certificates-title {
+    margin-top: 24px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.civic-certificate {
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    background: white;
+}
+
+.civic-certificate-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.civic-certificate-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.civic-certificate-number {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.civic-certificate-status {
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: #dcfce7;
+    color: #15803d;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.civic-certificate-date {
+    margin-top: 12px;
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.civic-no-certificates {
+    margin-top: 16px;
+    padding: 20px;
+    text-align: center;
+    border: 1px dashed #d1d5db;
+    border-radius: 16px;
+}
+
+@media (min-width: 640px) {
+    .civic-points-modal {
+        align-items: center;
+        padding: 16px;
+    }
+
+    .civic-points-card {
+        border-radius: 28px;
+    }
+}

@@ -267,7 +267,8 @@ class ComplaintController extends Controller
             'department',
             'media',
             'aiAnalyses',
-            'assignments.assignedTo',
+            // 'assignments.assignedTo',
+            'incident.assignments.assignedTo',
             'statusHistory',
         ])
             ->where(
@@ -306,7 +307,7 @@ class ComplaintController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $assignment = $complaint->assignments
+        $assignment = $complaint->incident?->assignments
             ->sortByDesc('id')
             ->first();
 

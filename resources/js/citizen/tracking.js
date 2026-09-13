@@ -311,6 +311,85 @@ function renderComplaint(complaint) {
 
     }
 
+    const reopenButton =
+    $('reopenButton');
+
+    if (reopenButton) {
+
+        reopenButton.onclick = () => {
+
+            reopenComplaint(
+                complaint.complaint_number
+            );
+
+        };
+    }
+
+
+    const verifyButton = $('verifyButton');
+
+    if (verifyButton) {
+        verifyButton.onclick = async () => {
+
+            const token =
+                localStorage.getItem('smart_vadodara_token');
+
+            if (!token) {
+                window.location.href = '/citizen/login';
+                return;
+            }
+
+            const complaintNumber =
+                complaint.complaint_number;
+
+            verifyButton.disabled = true;
+            verifyButton.textContent = 'Verifying...';
+
+            try {
+
+                const response = await fetch(
+                    `${API_BASE}/citizen/complaints/${encodeURIComponent(complaintNumber)}/verify-resolved`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            Accept: 'application/json',
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
+                );
+
+                const data =
+                    await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(
+                        data.message ?? 'Unable to verify resolution.'
+                    );
+                }
+
+                /*
+                * Reload complaint so the complete
+                * closed state and timeline are rendered.
+                */
+                await trackComplaint();
+
+            } catch (error) {
+
+                console.error(
+                    'Resolution Verification Error:',
+                    error
+                );
+
+                showError(
+                    error.message ??
+                    'Unable to verify resolution.'
+                );
+
+                verifyButton.disabled = false;
+                verifyButton.textContent = 'Verify Resolution';
+            }
+        };
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -321,6 +400,80 @@ function renderComplaint(complaint) {
     $('loading')?.classList.add('hidden');
     $('error')?.classList.add('hidden');
     $('result')?.classList.remove('hidden');
+}
+
+async function reopenComplaint(complaintNumber) {
+
+    const token =
+        localStorage.getItem('smart_vadodara_token');
+
+    if (!token) {
+        window.location.href = '/citizen/login';
+        return;
+    }
+
+    const button =
+        $('reopenButton');
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = 'Reopening...';
+    }
+
+    try {
+
+        const response = await fetch(
+            `${API_BASE}/citizen/complaints/${encodeURIComponent(complaintNumber)}/reopen`,
+            {
+                method: 'POST',
+
+                headers: {
+                    Accept: 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+            }
+        );
+
+        const data =
+            await response.json();
+
+        console.log(
+            'Reopen Complaint API:',
+            data
+        );
+
+        if (!response.ok || !data.success) {
+
+            throw new Error(
+                data.message ??
+                'Unable to reopen complaint.'
+            );
+        }
+
+        /*
+         * Reload the complaint so the new
+         * status and timeline are displayed.
+         */
+        await trackComplaint();
+
+    } catch (error) {
+
+        console.error(
+            'Reopen Complaint Error:',
+            error
+        );
+
+        showError(
+            error.message ??
+            'Unable to reopen complaint.'
+        );
+
+        if (button) {
+            button.disabled = false;
+            button.textContent =
+                'Issue Still Not Resolved? Reopen Complaint';
+        }
+    }
 }
 
 async function trackComplaint() {
@@ -356,8 +509,12 @@ async function trackComplaint() {
             {
                 method: 'GET',
 
+                // headers: {
+                //     Accept: 'application/json',
+                // },
                 headers: {
                     Accept: 'application/json',
+                    Authorization: `Bearer ${localStorage.getItem('smart_vadodara_token') ?? ''}`,
                 },
             }
         );

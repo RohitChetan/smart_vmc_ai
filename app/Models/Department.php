@@ -22,4 +22,9 @@ class Department extends Model
     {
         return $this->hasMany(Category::class);
     }
+
+    public function incidents(): HasMany
+    {
+        return $this->hasMany(CivicIncident::class, 'department_id');
+    }
 }

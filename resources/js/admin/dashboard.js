@@ -1,0 +1,1615 @@
+let map;
+let markers = [];
+
+const TOKEN_KEY = 'smart_vadodara_admin_token';
+
+let currentFilters = {
+    ward_id: '',
+    priority: '',
+    status: '',
+    department_id: ''
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+
+    const token = localStorage.getItem(TOKEN_KEY);
+
+    if (!token) {
+        window.location.href = '/admin/login';
+        return;
+    }
+
+    initializeMap();
+    loadDashboard();
+
+    document.getElementById('filterWard')
+        ?.addEventListener('change', applyFilters);
+
+    document.getElementById('filterPriority')
+        ?.addEventListener('change', applyFilters);
+
+    document.getElementById('filterStatus')
+        ?.addEventListener('change', applyFilters);
+
+    document.getElementById('filterDepartment')
+        ?.addEventListener('change', applyFilters);
+
+    // Auto refresh every 60 seconds
+    setInterval(() => {
+        loadDashboard();
+    }, 60000);
+});
+
+
+function getAuthHeaders() {
+
+    return {
+        'Accept': 'application/json',
+        'Authorization':
+            `Bearer ${localStorage.getItem(TOKEN_KEY)}`
+    };
+}
+
+
+async function apiFetch(url) {
+
+    const response = await fetch(url, {
+        headers: getAuthHeaders()
+    });
+
+    if (response.status === 401) {
+
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(
+            'smart_vadodara_admin_user'
+        );
+
+        window.location.href = '/admin/login';
+
+        throw new Error('Authentication expired.');
+    }
+
+    if (response.status === 403) {
+        throw new Error(
+            'Administrator access is required.'
+        );
+    }
+
+    if (!response.ok) {
+        throw new Error(
+            `API request failed: ${response.status}`
+        );
+    }
+
+    return response.json();
+}
+
+
+function buildQuery() {
+
+    const params = new URLSearchParams();
+
+    if (currentFilters.ward_id) {
+        params.set(
+            'ward_id',
+            currentFilters.ward_id
+        );
+    }
+
+    if (currentFilters.priority) {
+        params.set(
+            'priority',
+            currentFilters.priority
+        );
+    }
+
+    if (currentFilters.status) {
+        params.set(
+            'status',
+            currentFilters.status
+        );
+    }
+
+    if (currentFilters.department_id) {
+        params.set(
+            'department_id',
+            currentFilters.department_id
+        );
+    }
+
+    return params.toString();
+}
+
+
+window.applyFilters = function () {
+
+    currentFilters.ward_id =
+        document.getElementById('filterWard')?.value || '';
+
+    currentFilters.priority =
+        document.getElementById('filterPriority')?.value || '';
+
+    currentFilters.status =
+        document.getElementById('filterStatus')?.value || '';
+
+    currentFilters.department_id =
+        document.getElementById('filterDepartment')?.value || '';
+
+    loadDashboard();
+};
+
+
+window.clearFilters = function () {
+
+    document.getElementById('filterWard').value = '';
+    document.getElementById('filterPriority').value = '';
+    document.getElementById('filterStatus').value = '';
+    document.getElementById('filterDepartment').value = '';
+
+    currentFilters = {
+        ward_id: '',
+        priority: '',
+        status: '',
+        department_id: ''
+    };
+
+    loadDashboard();
+};
+
+
+window.loadDashboard = async function () {
+
+    const errorBox =
+        document.getElementById('errorBox');
+
+    errorBox.style.display = 'none';
+
+    try {
+
+        const query = buildQuery();
+
+        const dashboardUrl =
+            '/api/admin/dashboard';
+
+        const incidentsUrl =
+            '/api/admin/incidents?per_page=25' +
+            (query ? '&' + query : '');
+
+        const slaUrl =
+            '/api/admin/sla';
+
+        const mapUrl =
+            '/api/admin/map' +
+            (query ? '?' + query : '');
+
+        const [
+            dashboard,
+            incidents,
+            sla,
+            mapData
+        ] = await Promise.all([
+
+            apiFetch(dashboardUrl),
+            apiFetch(incidentsUrl),
+            apiFetch(slaUrl),
+            apiFetch(mapUrl)
+
+        ]);
+
+        renderDashboard(dashboard);
+        renderIncidents(incidents);
+        renderSla(sla);
+        renderMap(mapData);
+
+        populateFilters(dashboard);
+
+    } catch (error) {
+
+        console.error(error);
+
+        if (
+            error.message !==
+            'Authentication expired.'
+        ) {
+            errorBox.innerText =
+                error.message ||
+                'Unable to load Admin Command Center data.';
+
+            errorBox.style.display = 'block';
+        }
+    }
+};
+
+
+function renderDashboard(data) {
+
+    const summary =
+        data.summary ?? {};
+
+    document.getElementById(
+        'totalIncidents'
+    ).innerText =
+        summary.total_incidents ?? 0;
+
+    document.getElementById(
+        'criticalIncidents'
+    ).innerText =
+        data.priority?.critical ?? 0;
+
+    // FIXED API FIELD
+    document.getElementById(
+        'progressIncidents'
+    ).innerText =
+        summary.in_progress_incidents ?? 0;
+
+    // FIXED API FIELD
+    document.getElementById(
+        'closedIncidents'
+    ).innerText =
+        summary.closed_incidents ?? 0;
+
+    document.getElementById(
+        'breachedIncidents'
+    ).innerText =
+        data.sla?.breached ?? 0;
+
+    renderWardStats(
+        data.wards ?? []
+    );
+}
+
+
+function populateFilters(data) {
+
+    const wardSelect =
+        document.getElementById('filterWard');
+
+    const departmentSelect =
+        document.getElementById('filterDepartment');
+
+    const selectedWard =
+        currentFilters.ward_id;
+
+    const selectedDepartment =
+        currentFilters.department_id;
+
+    if (wardSelect) {
+
+        wardSelect.innerHTML =
+            '<option value="">All Wards</option>';
+
+        (data.wards ?? []).forEach(ward => {
+
+            const option =
+                document.createElement('option');
+
+            option.value =
+                ward.ward_id;
+
+            option.textContent =
+                `Ward ${ward.ward_no} - ${ward.name}`;
+
+            wardSelect.appendChild(option);
+        });
+
+        wardSelect.value = selectedWard;
+    }
+
+    if (departmentSelect) {
+
+        departmentSelect.innerHTML =
+            '<option value="">All Departments</option>';
+
+        (data.departments ?? []).forEach(department => {
+
+            const option =
+                document.createElement('option');
+
+            option.value =
+                department.department_id;
+
+            option.textContent =
+                department.name;
+
+            departmentSelect.appendChild(option);
+        });
+
+        departmentSelect.value =
+            selectedDepartment;
+    }
+}
+
+
+function renderWardStats(wards) {
+
+    const container =
+        document.getElementById('wardStats');
+
+    if (!wards.length) {
+
+        container.innerHTML =
+            '<div class="loading">No ward data</div>';
+
+        return;
+    }
+
+    container.innerHTML = wards
+        .map(ward => {
+
+            return `
+                <div class="stat-row">
+
+                    <div>
+                        <div class="stat-name">
+                            Ward ${escapeHtml(
+                                ward.ward_no ?? ''
+                            )}
+                        </div>
+
+                        <div style="
+                            font-size:11px;
+                            color:#6b7280;
+                        ">
+                            ${escapeHtml(
+                                ward.name ?? ''
+                            )}
+                        </div>
+                    </div>
+
+                    <div class="stat-count">
+                        ${ward.incident_count ?? 0}
+                    </div>
+
+                </div>
+            `;
+
+        })
+        .join('');
+}
+
+
+function renderSla(data) {
+
+    const container =
+        document.getElementById('slaAlerts');
+
+    const escalations =
+        data.data ?? [];
+
+    if (!escalations.length) {
+
+        container.innerHTML = `
+            <div class="alert warning-alert">
+
+                <div class="alert-title">
+                    ✓ No active SLA escalations
+                </div>
+
+                <div class="alert-text">
+                    All monitored incidents are currently
+                    within SLA.
+                </div>
+
+            </div>
+        `;
+
+        return;
+    }
+
+    container.innerHTML = escalations
+        .slice(0, 8)
+        .map(item => {
+
+            const level =
+                item.level ?? 'warning';
+
+            return `
+                <div class="alert ${
+                    level === 'warning'
+                        ? 'warning-alert'
+                        : ''
+                }">
+
+                    <div class="alert-title">
+                        ${escapeHtml(
+                            level.toUpperCase()
+                        )}
+
+                        ·
+
+                        ${escapeHtml(
+                            item.incident
+                                ?.incident_number ??
+                            'Incident'
+                        )}
+                    </div>
+
+                    <div class="alert-text">
+                        ${escapeHtml(
+                            item.reason ??
+                            'SLA escalation triggered.'
+                        )}
+                    </div>
+
+                </div>
+            `;
+
+        })
+        .join('');
+}
+
+
+function renderIncidents(data) {
+
+    const tbody =
+        document.getElementById('incidentTable');
+
+    const incidents =
+        data.data ?? [];
+
+    if (!incidents.length) {
+
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="loading">
+                    No incidents found.
+                </td>
+            </tr>
+        `;
+
+        return;
+    }
+
+    tbody.innerHTML = incidents
+        .map(incident => {
+
+            const statusClass =
+                getStatusClass(
+                    incident.status
+                );
+
+            const priorityClass =
+                `priority-${
+                    incident.priority ?? 'medium'
+                }`;
+
+            const officer =
+                incident.assigned_officer?.name ??
+                'Unassigned';
+
+            return `
+                <tr
+                    class="incident-click"
+                    onclick='openIncidentModal(${JSON.stringify(
+                        incident
+                    ).replaceAll("'", "&#039;")})'
+                >
+
+                    <td>
+                        <strong>
+                            ${escapeHtml(
+                                incident.incident_number ?? '-'
+                            )}
+                        </strong>
+                    </td>
+
+                    <td>
+                        ${escapeHtml(
+                            incident.category?.name ?? '-'
+                        )}
+                    </td>
+
+                    <td>
+                        ${
+                            incident.ward
+                                ? `Ward ${
+                                    escapeHtml(
+                                        String(
+                                            incident.ward.ward_no
+                                        )
+                                    )}`
+                                : '—'
+                        }
+                    </td>
+
+                    <td>
+                        ${escapeHtml(
+                            incident.department?.name ?? '-'
+                        )}
+                    </td>
+
+                    <td class="${priorityClass}">
+                        ${escapeHtml(
+                            incident.priority ?? '-'
+                        ).toUpperCase()}
+                    </td>
+
+                    <td>
+                        <span class="status ${statusClass}">
+                            ${formatStatus(
+                                incident.status
+                            )}
+                        </span>
+                    </td>
+
+                    <td>
+                        ${escapeHtml(officer)}
+                    </td>
+
+                    <td>
+                        ${incident.report_count ?? 0}
+                    </td>
+
+                </tr>
+            `;
+
+        })
+        .join('');
+}
+
+
+function renderMap(data) {
+
+    markers.forEach(marker => {
+        map.removeLayer(marker);
+    });
+
+    markers = [];
+
+    const incidents =
+        data.data ??
+        data.incidents ??
+        [];
+
+    incidents.forEach(incident => {
+
+        const lat =
+            parseFloat(
+                incident.latitude ??
+                incident.location?.latitude
+            );
+
+        const lng =
+            parseFloat(
+                incident.longitude ??
+                incident.location?.longitude
+            );
+
+        if (
+            Number.isNaN(lat) ||
+            Number.isNaN(lng)
+        ) {
+            return;
+        }
+
+        const marker =
+            L.marker([lat, lng])
+                .addTo(map);
+
+        marker.bindPopup(`
+            <strong>
+                ${escapeHtml(
+                    incident.incident_number ??
+                    'Incident'
+                )}
+            </strong>
+
+            <br>
+
+            ${escapeHtml(
+                incident.category?.name ??
+                'Civic Issue'
+            )}
+
+            <br>
+
+            Ward ${
+                escapeHtml(
+                    String(
+                        incident.ward?.ward_no ??
+                        'Unknown'
+                    )
+                )
+            }
+
+            <br>
+
+            <strong>
+                ${escapeHtml(
+                    incident.priority ?? ''
+                ).toUpperCase()}
+            </strong>
+
+            <br>
+
+            ${formatStatus(
+                incident.status
+            )}
+
+            <br><br>
+
+            <button
+                onclick='openIncidentModal(${JSON.stringify(
+                    incident
+                ).replaceAll("'", "&#039;")})'
+                style="
+                    background:#2563eb;
+                    color:white;
+                    border:0;
+                    padding:7px 10px;
+                    border-radius:6px;
+                    cursor:pointer;
+                "
+            >
+                View Details
+            </button>
+        `);
+
+        markers.push(marker);
+    });
+}
+
+
+window.openIncidentModal = async function (incident) {
+
+    const modal =
+        document.getElementById('incidentModal');
+
+    const details =
+        document.getElementById('incidentDetails');
+
+    modal.style.display = 'block';
+
+    details.innerHTML = `
+        <div class="loading">
+            Loading incident intelligence...
+        </div>
+    `;
+
+    try {
+
+        const data =
+            await apiFetch(
+                `/api/admin/incidents/${incident.id}`
+            );
+
+        renderIncidentDetail(
+            data.incident
+        );
+
+    } catch (error) {
+
+        console.error(error);
+
+        details.innerHTML = `
+            <div class="alert">
+                Unable to load incident details.
+            </div>
+        `;
+    }
+};
+
+
+function renderIncidentDetail(incident) {
+
+    const details =
+        document.getElementById('incidentDetails');
+
+    const dueAt =
+        incident.sla?.due_at;
+
+    let slaText = 'No SLA';
+
+    if (dueAt) {
+
+        const due =
+            new Date(dueAt);
+
+        const now =
+            new Date();
+
+        const diff =
+            due.getTime() -
+            now.getTime();
+
+        if (diff <= 0) {
+
+            slaText = `
+                <span class="critical">
+                    BREACHED ·
+                    ${formatDuration(Math.abs(diff))}
+                    overdue
+                </span>
+            `;
+
+        } else {
+
+            slaText = `
+                <span class="warning">
+                    ${formatDuration(diff)}
+                    remaining
+                </span>
+            `;
+        }
+    }
+
+    const complaints =
+        incident.complaints ?? [];
+
+    details.innerHTML = `
+
+        <div style="
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:12px;
+        ">
+
+            ${detailBox(
+                'Incident',
+                incident.incident_number
+            )}
+
+            ${detailBox(
+                'Category',
+                incident.category?.name ?? '-'
+            )}
+
+            ${detailBox(
+                'Ward',
+                incident.ward
+                    ? `Ward ${incident.ward.ward_no} - ${incident.ward.name}`
+                    : 'Not Assigned'
+            )}
+
+            ${detailBox(
+                'Department',
+                incident.department?.name ?? '-'
+            )}
+
+            ${detailBox(
+                'Priority',
+                String(
+                    incident.priority ?? '-'
+                ).toUpperCase()
+            )}
+
+            ${detailBox(
+                'Status',
+                formatStatus(
+                    incident.status
+                )
+            )}
+
+            ${detailBox(
+                'Officer',
+                incident.assigned_officer?.name ??
+                'Unassigned'
+            )}
+
+            ${detailBox(
+                'Citizen Reports',
+                incident.report_count ?? 0
+            )}
+
+        </div>
+
+        <div style="
+            margin-top:15px;
+            padding:15px;
+            background:#f8fafc;
+            border-radius:9px;
+        ">
+
+            <strong>⏱ SLA</strong>
+
+            <div style="margin-top:7px;">
+                ${slaText}
+            </div>
+
+            ${
+                dueAt
+                    ? `
+                        <div style="
+                            font-size:11px;
+                            color:#6b7280;
+                            margin-top:5px;
+                        ">
+                            Due:
+                            ${new Date(
+                                dueAt
+                            ).toLocaleString()}
+                        </div>
+                    `
+                    : ''
+            }
+
+        </div>
+
+        <div style="
+            margin-top:15px;
+            padding:15px;
+            background:#f8fafc;
+            border-radius:9px;
+        ">
+
+            <strong>📍 Location</strong>
+
+            <div style="
+                margin-top:7px;
+                font-size:13px;
+            ">
+                ${incident.location?.latitude ?? '-'},
+                ${incident.location?.longitude ?? '-'}
+            </div>
+
+        </div>
+
+        <div style="
+            margin-top:15px;
+        ">
+
+            <strong>🤖 AI Intelligence</strong>
+
+            <div style="
+                margin-top:10px;
+            ">
+
+                ${
+                    complaints.length
+                        ? complaints.map(
+                            renderComplaintAI
+                        ).join('')
+                        : `
+                            <div style="
+                                padding:12px;
+                                background:#f8fafc;
+                                border-radius:8px;
+                                color:#6b7280;
+                                font-size:13px;
+                            ">
+                                No linked complaint data.
+                            </div>
+                        `
+                }
+
+            </div>
+
+        </div>
+
+        <div style="
+            margin-top:15px;
+        ">
+
+            <strong>👥 Citizen Reports</strong>
+
+            <div style="
+                margin-top:10px;
+            ">
+
+                ${
+                    complaints.length
+                        ? complaints.map(
+                            renderComplaintSummary
+                        ).join('')
+                        : `
+                            <div style="
+                                padding:12px;
+                                background:#f8fafc;
+                                border-radius:8px;
+                            ">
+                                No reports found.
+                            </div>
+                        `
+                }
+
+            </div>
+
+        </div>
+
+    `;
+}
+
+
+function renderComplaintAI(complaint) {
+
+    const analyses =
+        complaint.ai_analyses ?? [];
+
+    const media =
+        complaint.media ?? [];
+
+    const proofs =
+        complaint.resolution_proofs ?? [];
+
+    return `
+        <div style="
+            margin-bottom:14px;
+            padding:14px;
+            border:1px solid #e5e7eb;
+            border-radius:10px;
+            background:white;
+        ">
+
+            <div style="
+                font-weight:700;
+                font-size:13px;
+            ">
+                ${escapeHtml(
+                    complaint.complaint_number
+                )}
+            </div>
+
+            <div style="
+                margin-top:8px;
+                font-size:12px;
+            ">
+                AI Category:
+                <strong>
+                    ${escapeHtml(
+                        complaint.ai_category?.name ??
+                        'Not available'
+                    )}
+                </strong>
+            </div>
+
+            <div style="
+                margin-top:4px;
+                font-size:12px;
+            ">
+                AI Confidence:
+                <strong>
+                    ${
+                        complaint.ai_confidence !== null &&
+                        complaint.ai_confidence !== undefined
+                            ? `${(
+                                Number(
+                                    complaint.ai_confidence
+                                ) * 100
+                              ).toFixed(1)}%`
+                            : 'N/A'
+                    }
+                </strong>
+            </div>
+
+            ${
+                complaint.ai_decision_reason
+                    ? `
+                        <div style="
+                            margin-top:7px;
+                            font-size:12px;
+                            color:#6b7280;
+                        ">
+                            ${escapeHtml(
+                                complaint.ai_decision_reason
+                            )}
+                        </div>
+                    `
+                    : ''
+            }
+
+            ${
+                analyses.length
+                    ? `
+                        <div style="
+                            margin-top:12px;
+                            font-weight:650;
+                            font-size:12px;
+                        ">
+                            🤖 AI Analysis
+                        </div>
+
+                        ${analyses.map(
+                            renderAIAnalysis
+                        ).join('')}
+                    `
+                    : ''
+            }
+
+            ${
+                media.length
+                    ? `
+                        <div style="
+                            margin-top:14px;
+                            font-weight:650;
+                            font-size:12px;
+                        ">
+                            📷 Complaint Media
+                        </div>
+
+                        <div style="
+                            display:flex;
+                            flex-wrap:wrap;
+                            gap:10px;
+                            margin-top:8px;
+                        ">
+                            ${media.map(
+                                renderMediaPreview
+                            ).join('')}
+                        </div>
+                    `
+                    : ''
+            }
+
+            ${
+                proofs.length
+                    ? `
+                        <div style="
+                            margin-top:16px;
+                            font-weight:650;
+                            font-size:12px;
+                        ">
+                            📸 Resolution Proof
+                        </div>
+
+                        <div style="
+                            margin-top:8px;
+                        ">
+                            ${proofs.map(
+                                renderResolutionProof
+                            ).join('')}
+                        </div>
+                    `
+                    : `
+                        <div style="
+                            margin-top:14px;
+                            padding:10px;
+                            background:#f8fafc;
+                            border-radius:7px;
+                            color:#6b7280;
+                            font-size:11px;
+                        ">
+                            No resolution proof submitted yet.
+                        </div>
+                    `
+            }
+
+        </div>
+    `;
+}
+
+
+function renderAIAnalysis(analysis) {
+
+    let detections = '';
+
+    if (analysis.detections) {
+
+        try {
+
+            detections =
+                JSON.stringify(
+                    analysis.detections,
+                    null,
+                    2
+                );
+
+        } catch (e) {
+
+            detections =
+                String(
+                    analysis.detections
+                );
+        }
+    }
+
+    return `
+        <div style="
+            margin-top:8px;
+            padding:10px;
+            background:#f8fafc;
+            border-radius:7px;
+            font-size:11px;
+        ">
+
+            <strong>
+                ${escapeHtml(
+                    analysis.model_name ??
+                    'AI Model'
+                )}
+            </strong>
+
+            ·
+
+            ${escapeHtml(
+                analysis.model_version ?? '-'
+            )}
+
+            <br>
+
+            Confidence:
+            <strong>
+                ${
+                    analysis.confidence !== null &&
+                    analysis.confidence !== undefined
+                        ? `${(
+                            Number(
+                                analysis.confidence
+                            ) * 100
+                          ).toFixed(1)}%`
+                        : 'N/A'
+                }
+            </strong>
+
+            <br>
+
+            Status:
+            ${escapeHtml(
+                analysis.status ?? '-'
+            )}
+
+            ${
+                detections
+                    ? `
+                        <details style="
+                            margin-top:7px;
+                        ">
+                            <summary style="
+                                cursor:pointer;
+                            ">
+                                View detections
+                            </summary>
+
+                            <pre style="
+                                margin-top:6px;
+                                white-space:pre-wrap;
+                                font-size:10px;
+                            ">${escapeHtml(
+                                detections
+                            )}</pre>
+                        </details>
+                    `
+                    : ''
+            }
+
+        </div>
+    `;
+}
+
+
+function renderMediaPreview(media) {
+
+    const url =
+        media.url;
+
+    if (!url) {
+        return '';
+    }
+
+    if (
+        media.type === 'video' ||
+        (media.mime_type ?? '').startsWith('video/')
+    ) {
+
+        return `
+            <video
+                controls
+                style="
+                    width:150px;
+                    height:105px;
+                    object-fit:cover;
+                    border-radius:8px;
+                    background:#111827;
+                "
+                src="${escapeHtml(url)}"
+            ></video>
+        `;
+    }
+
+    return `
+        <a
+            href="${escapeHtml(url)}"
+            target="_blank"
+            rel="noopener"
+        >
+            <img
+                src="${escapeHtml(url)}"
+                alt="Complaint media"
+                style="
+                    width:150px;
+                    height:105px;
+                    object-fit:cover;
+                    border-radius:8px;
+                    border:1px solid #e5e7eb;
+                "
+            >
+        </a>
+    `;
+}
+
+
+function renderResolutionProof(proof) {
+
+    const status =
+        proof.ai_status ?? 'pending';
+
+    const statusLabel =
+        status.replaceAll('_', ' ').toUpperCase();
+
+    let statusClass =
+        'status-assigned';
+
+    if (status === 'verified') {
+        statusClass = 'status-resolved';
+    }
+
+    if (status === 'rejected') {
+        statusClass = 'status-open';
+    }
+
+    let confidence = 'N/A';
+
+    if (
+        proof.ai_confidence !== null &&
+        proof.ai_confidence !== undefined
+    ) {
+
+        confidence =
+            `${(
+                Number(
+                    proof.ai_confidence
+                ) * 100
+            ).toFixed(1)}%`;
+    }
+
+    let resultText = '';
+
+    if (proof.ai_result) {
+
+        try {
+
+            const result =
+                typeof proof.ai_result === 'string'
+                    ? JSON.parse(proof.ai_result)
+                    : proof.ai_result;
+
+            resultText =
+                result.reason ??
+                result.message ??
+                '';
+
+        } catch (e) {
+
+            resultText =
+                String(
+                    proof.ai_result
+                );
+        }
+    }
+
+    return `
+        <div style="
+            padding:12px;
+            margin-bottom:8px;
+            border:1px solid #e5e7eb;
+            border-radius:8px;
+        ">
+
+            <div style="
+                display:flex;
+                justify-content:space-between;
+                align-items:center;
+                gap:10px;
+            ">
+
+                <strong style="
+                    font-size:12px;
+                ">
+                    ${escapeHtml(
+                        proof.type ?? 'Proof'
+                    ).toUpperCase()}
+                </strong>
+
+                <span class="status ${statusClass}">
+                    ${escapeHtml(statusLabel)}
+                </span>
+
+            </div>
+
+            ${
+                proof.url
+                    ? `
+                        <div style="
+                            margin-top:9px;
+                        ">
+                            ${
+                                proof.type === 'video'
+                                    ? `
+                                        <video
+                                            controls
+                                            src="${escapeHtml(
+                                                proof.url
+                                            )}"
+                                            style="
+                                                width:220px;
+                                                max-width:100%;
+                                                border-radius:8px;
+                                                background:#111827;
+                                            "
+                                        ></video>
+                                    `
+                                    : `
+                                        <a
+                                            href="${escapeHtml(
+                                                proof.url
+                                            )}"
+                                            target="_blank"
+                                            rel="noopener"
+                                        >
+                                            <img
+                                                src="${escapeHtml(
+                                                    proof.url
+                                                )}"
+                                                alt="Resolution proof"
+                                                style="
+                                                    width:220px;
+                                                    max-width:100%;
+                                                    max-height:180px;
+                                                    object-fit:cover;
+                                                    border-radius:8px;
+                                                "
+                                            >
+                                        </a>
+                                    `
+                            }
+                        </div>
+                    `
+                    : ''
+            }
+
+            <div style="
+                margin-top:8px;
+                font-size:11px;
+                color:#6b7280;
+            ">
+
+                AI Confidence:
+                <strong>
+                    ${escapeHtml(confidence)}
+                </strong>
+
+                ${
+                    proof.captured_at
+                        ? `
+                            <br>
+                            Captured:
+                            ${new Date(
+                                proof.captured_at
+                            ).toLocaleString()}
+                          `
+                        : ''
+                }
+
+                ${
+                    proof.latitude &&
+                    proof.longitude
+                        ? `
+                            <br>
+                            GPS:
+                            ${escapeHtml(
+                                String(
+                                    proof.latitude
+                                )
+                            )},
+                            ${escapeHtml(
+                                String(
+                                    proof.longitude
+                                )
+                            )}
+                          `
+                        : ''
+                }
+
+                ${
+                    resultText
+                        ? `
+                            <div style="
+                                margin-top:6px;
+                            ">
+                                ${escapeHtml(
+                                    resultText
+                                )}
+                            </div>
+                          `
+                        : ''
+                }
+
+                ${
+                    proof.remarks
+                        ? `
+                            <div style="
+                                margin-top:5px;
+                            ">
+                                Remarks:
+                                ${escapeHtml(
+                                    proof.remarks
+                                )}
+                            </div>
+                          `
+                        : ''
+                }
+
+            </div>
+
+        </div>
+    `;
+}
+
+
+function renderComplaintSummary(complaint) {
+
+    return `
+        <div style="
+            margin-bottom:8px;
+            padding:11px;
+            background:#f8fafc;
+            border-radius:8px;
+            font-size:12px;
+        ">
+
+            <strong>
+                ${escapeHtml(
+                    complaint.complaint_number
+                )}
+            </strong>
+
+            ·
+
+            ${escapeHtml(
+                formatStatus(
+                    complaint.status
+                )
+            )}
+
+            ·
+
+            ${escapeHtml(
+                String(
+                    complaint.priority ??
+                    '-'
+                ).toUpperCase()
+            )}
+
+            ${
+                complaint.description
+                    ? `
+                        <div style="
+                            margin-top:5px;
+                            color:#6b7280;
+                        ">
+                            ${escapeHtml(
+                                complaint.description
+                            )}
+                        </div>
+                    `
+                    : ''
+            }
+
+        </div>
+    `;
+}
+
+
+window.closeIncidentModal = function () {
+
+    document.getElementById(
+        'incidentModal'
+    ).style.display = 'none';
+};
+
+
+function detailBox(label, value) {
+
+    return `
+        <div style="
+            background:#f8fafc;
+            padding:12px;
+            border-radius:8px;
+        ">
+
+            <div style="
+                color:#6b7280;
+                font-size:11px;
+            ">
+                ${escapeHtml(label)}
+            </div>
+
+            <div style="
+                margin-top:4px;
+                font-weight:650;
+                font-size:13px;
+            ">
+                ${escapeHtml(value)}
+            </div>
+
+        </div>
+    `;
+}
+
+
+function formatDuration(milliseconds) {
+
+    let seconds =
+        Math.floor(milliseconds / 1000);
+
+    const hours =
+        Math.floor(seconds / 3600);
+
+    seconds %= 3600;
+
+    const minutes =
+        Math.floor(seconds / 60);
+
+    seconds %= 60;
+
+    return `${hours}h ${minutes}m ${seconds}s`;
+}
+
+
+function getStatusClass(status) {
+
+    switch (status) {
+
+        case 'open':
+            return 'status-open';
+
+        case 'assigned':
+            return 'status-assigned';
+
+        case 'in_progress':
+            return 'status-progress';
+
+        case 'resolved':
+        case 'verification_pending':
+            return 'status-resolved';
+
+        case 'closed':
+            return 'status-closed';
+
+        default:
+            return 'status-assigned';
+    }
+}
+
+
+function formatStatus(status) {
+
+    if (!status) {
+        return '-';
+    }
+
+    return status
+        .replaceAll('_', ' ')
+        .replace(/\b\w/g, char =>
+            char.toUpperCase()
+        );
+}
+
+
+function escapeHtml(value) {
+
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+
+function initializeMap() {
+
+    map = L.map('incidentMap')
+        .setView(
+            [22.3072, 73.1812],
+            12
+        );
+
+    L.tileLayer(
+        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        {
+            maxZoom: 19,
+            attribution:
+                '&copy; OpenStreetMap contributors'
+        }
+    ).addTo(map);
+}

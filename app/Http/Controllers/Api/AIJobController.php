@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\ComplaintAIAnalysis;
+use App\Models\ComplaintStatusHistory;
 use App\Services\IncidentAssignmentService;
 use App\Services\IncidentClusteringService;
 use App\Services\WardLocator;
@@ -14,6 +15,9 @@ use Illuminate\Support\Facades\Storage;
 
 class AIJobController extends Controller
 {
+    /**
+     * Get pending AI jobs.
+     */
     public function pending(): JsonResponse
     {
         $jobs = ComplaintAIAnalysis::with([
@@ -36,23 +40,37 @@ class AIJobController extends Controller
 
                     'complaint' => [
                         'id' => $job->complaint->id,
-                        'complaint_number' => $job->complaint->complaint_number,
-                        'description' => $job->complaint->description,
+                        'complaint_number' =>
+                            $job->complaint->complaint_number,
+
+                        'description' =>
+                            $job->complaint->description,
 
                         'location' => [
-                            'latitude' => $job->complaint->latitude,
-                            'longitude' => $job->complaint->longitude,
+                            'latitude' =>
+                                $job->complaint->latitude,
+
+                            'longitude' =>
+                                $job->complaint->longitude,
                         ],
 
                         'ward' => [
-                            'id' => $job->complaint->ward?->id,
-                            'ward_no' => $job->complaint->ward?->ward_no,
-                            'name' => $job->complaint->ward?->name,
+                            'id' =>
+                                $job->complaint->ward?->id,
+
+                            'ward_no' =>
+                                $job->complaint->ward?->ward_no,
+
+                            'name' =>
+                                $job->complaint->ward?->name,
                         ],
 
                         'user_category' => [
-                            'id' => $job->complaint->userCategory?->id,
-                            'name' => $job->complaint->userCategory?->name,
+                            'id' =>
+                                $job->complaint->userCategory?->id,
+
+                            'name' =>
+                                $job->complaint->userCategory?->name,
                         ],
 
                         'media' => $job->complaint->media
@@ -71,6 +89,9 @@ class AIJobController extends Controller
         ]);
     }
 
+    /**
+     * Save AI result and route complaint.
+     */
     public function result(
         Request $request,
         int $analysisId,
@@ -79,20 +100,72 @@ class AIJobController extends Controller
         WardLocator $wardLocator
     ): JsonResponse {
         $data = $request->validate([
-            'predicted_category' => ['required', 'string', 'max:255'],
-            'confidence' => ['required', 'numeric', 'between:0,1'],
-            'priority' => ['required', 'in:low,medium,high,critical'],
-            'reason' => ['nullable', 'string', 'max:2000'],
-            'detections' => ['nullable', 'array'],
-            'raw_result' => ['nullable', 'array'],
-            'model_name' => ['nullable', 'string', 'max:255'],
-            'model_version' => ['nullable', 'string', 'max:100'],
+            'predicted_category' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'confidence' => [
+                'required',
+                'numeric',
+                'between:0,1',
+            ],
+
+            'priority' => [
+                'required',
+                'in:low,medium,high,critical',
+            ],
+
+            'reason' => [
+                'nullable',
+                'string',
+                'max:2000',
+            ],
+
+            'detections' => [
+                'nullable',
+                'array',
+            ],
+
+            'raw_result' => [
+                'nullable',
+                'array',
+            ],
+
+            'model_name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'model_version' => [
+                'nullable',
+                'string',
+                'max:100',
+            ],
         ]);
 
-        $analysis = ComplaintAIAnalysis::with('complaint')
-            ->findOrFail($analysisId);
+        /*
+        |--------------------------------------------------------------------------
+        | Load AI Analysis
+        |--------------------------------------------------------------------------
+        */
 
-        $category = Category::where('name', $data['predicted_category'])
+        $analysis = ComplaintAIAnalysis::with([
+            'complaint',
+        ])->findOrFail($analysisId);
+
+        $complaint = $analysis->complaint;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Find AI Category
+        |--------------------------------------------------------------------------
+        */
+
+        $category = Category::query()
+            ->where('name', $data['predicted_category'])
             ->where('is_active', true)
             ->first();
 
@@ -102,25 +175,6 @@ class AIJobController extends Controller
                 'message' => 'AI predicted category not found.',
             ], 422);
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Save AI Analysis
-        |--------------------------------------------------------------------------
-        */
-
-        $analysis->update([
-            'model_name' => $data['model_name'] ?? 'local-ai',
-            'model_version' => $data['model_version'] ?? '1.0',
-            'predicted_category' => $data['predicted_category'],
-            'confidence' => $data['confidence'],
-            'detections' => $data['detections'] ?? null,
-            'raw_result' => $data['raw_result'] ?? null,
-            'status' => 'completed',
-            'error_message' => null,
-        ]);
-
-        $complaint = $analysis->complaint;
 
         /*
         |--------------------------------------------------------------------------
@@ -143,24 +197,70 @@ class AIJobController extends Controller
         if (!$detectedWard) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unable to determine ward from complaint GPS location.',
+                'message' =>
+                    'Unable to determine ward from complaint GPS location.',
             ], 422);
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Update Complaint With AI Decision + GIS Ward
+        | Save AI Analysis
+        |--------------------------------------------------------------------------
+        */
+
+        $analysis->update([
+            'model_name' =>
+                $data['model_name'] ?? 'local-ai',
+
+            'model_version' =>
+                $data['model_version'] ?? '1.0',
+
+            'predicted_category' =>
+                $data['predicted_category'],
+
+            'confidence' =>
+                $data['confidence'],
+
+            'detections' =>
+                $data['detections'] ?? null,
+
+            'raw_result' =>
+                $data['raw_result'] ?? null,
+
+            'status' =>
+                'completed',
+
+            'error_message' =>
+                null,
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Save Complaint AI Decision + GIS Ward
         |--------------------------------------------------------------------------
         */
 
         $complaint->update([
-            'ai_category_id' => $category->id,
-            'department_id' => $category->department_id,
-            'ward_id' => $detectedWard->id,
-            'priority' => $data['priority'],
-            'ai_confidence' => $data['confidence'],
-            'ai_decision_reason' => $data['reason'] ?? null,
-            'status' => 'ai_processing',
+            'ai_category_id' =>
+                $category->id,
+
+            'department_id' =>
+                $category->department_id,
+
+            'ward_id' =>
+                $detectedWard->id,
+
+            'priority' =>
+                $data['priority'],
+
+            'ai_confidence' =>
+                $data['confidence'],
+
+            'ai_decision_reason' =>
+                $data['reason'] ?? null,
+
+            'status' =>
+                'ai_processing',
         ]);
 
         /*
@@ -169,21 +269,39 @@ class AIJobController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $incident = $incidentService->attachComplaint($complaint);
+        $incident = $incidentService->attachComplaint(
+            $complaint->fresh()
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | IMPORTANT: Sync Complaint Ward From Incident
+        |--------------------------------------------------------------------------
+        |
+        | Incident clustering can attach the complaint to an existing
+        | incident. Therefore the final source of truth is the incident ward.
+        |
+        */
+
+        if ($incident->ward_id) {
+            $complaint->update([
+                'ward_id' => $incident->ward_id,
+            ]);
+        }
 
         /*
         |--------------------------------------------------------------------------
         | Incident-Level Assignment
         |--------------------------------------------------------------------------
         |
-        | Multiple complaints can belong to the same incident.
-        | Only ONE active field assignment is created for that incident.
+        | One active field assignment per civic incident.
         |
         */
 
-        $incidentAssignment = $incidentAssignmentService->assign(
-            $incident
-        );
+        $incidentAssignment =
+            $incidentAssignmentService->assign(
+                $incident->fresh()
+            );
 
         /*
         |--------------------------------------------------------------------------
@@ -197,6 +315,46 @@ class AIJobController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | Status History
+        |--------------------------------------------------------------------------
+        */
+
+        ComplaintStatusHistory::create([
+            'complaint_id' =>
+                $complaint->id,
+
+            'status' =>
+                'assigned',
+
+            'changed_by' =>
+                null,
+
+            'remarks' =>
+                'Complaint automatically assigned by AI and incident routing engine.',
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Refresh Relations For Response
+        |--------------------------------------------------------------------------
+        */
+
+        $complaint->refresh();
+
+        $incident->load([
+            'category',
+            'department',
+            'ward',
+            'assignments.assignedTo',
+        ]);
+
+        $incidentAssignment->load([
+            'assignedTo',
+            'assignedBy',
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
         | Response
         |--------------------------------------------------------------------------
         */
@@ -204,75 +362,138 @@ class AIJobController extends Controller
         return response()->json([
             'success' => true,
 
-            'message' => 'AI result saved and incident routed successfully.',
+            'message' =>
+                'AI result saved and incident routed successfully.',
 
             'complaint' => [
-                'id' => $complaint->id,
-                'complaint_number' => $complaint->complaint_number,
+                'id' =>
+                    $complaint->id,
 
-                'status' => $complaint->status,
+                'complaint_number' =>
+                    $complaint->complaint_number,
+
+                'status' =>
+                    $complaint->status,
 
                 'ward' => [
-                    'id' => $detectedWard->id,
-                    'ward_no' => $detectedWard->ward_no,
-                    'name' => $detectedWard->name,
+                    'id' =>
+                        $complaint->ward?->id,
+
+                    'ward_no' =>
+                        $complaint->ward?->ward_no,
+
+                    'name' =>
+                        $complaint->ward?->name,
                 ],
 
-                'ai_category' => $category->name,
+                'ai_category' => [
+                    'id' =>
+                        $category->id,
 
-                'department' => $category->department?->name,
+                    'name' =>
+                        $category->name,
+                ],
 
-                'priority' => $complaint->priority,
+                'department' => [
+                    'id' =>
+                        $category->department?->id,
 
-                'confidence' => $complaint->ai_confidence,
+                    'name' =>
+                        $category->department?->name,
+                ],
+
+                'priority' =>
+                    $complaint->priority,
+
+                'confidence' =>
+                    $complaint->ai_confidence,
+
+                'ai_decision_reason' =>
+                    $complaint->ai_decision_reason,
             ],
 
             'incident' => [
-                'id' => $incident->id,
-                'incident_number' => $incident->incident_number,
+                'id' =>
+                    $incident->id,
 
-                'report_count' => $incident->report_count,
+                'incident_number' =>
+                    $incident->incident_number,
 
-                'status' => $incident->status,
+                'title' =>
+                    $incident->title,
 
-                'priority' => $incident->priority,
+                'report_count' =>
+                    $incident->report_count,
+
+                'status' =>
+                    $incident->status,
+
+                'priority' =>
+                    $incident->priority,
 
                 'ward' => [
-                    'id' => $incident->ward?->id,
-                    'ward_no' => $incident->ward?->ward_no,
-                    'name' => $incident->ward?->name,
+                    'id' =>
+                        $incident->ward?->id,
+
+                    'ward_no' =>
+                        $incident->ward?->ward_no,
+
+                    'name' =>
+                        $incident->ward?->name,
+                ],
+
+                'assigned_officer' => [
+                    'id' =>
+                        $incidentAssignment->assignedTo?->id,
+
+                    'name' =>
+                        $incidentAssignment->assignedTo?->name,
+
+                    'email' =>
+                        $incidentAssignment->assignedTo?->email,
                 ],
             ],
 
             'assignment' => [
-                'id' => $incidentAssignment->id,
+                'id' =>
+                    $incidentAssignment->id,
 
-                'assigned_to' => $incidentAssignment
-                    ->assignedTo
-                    ?->name,
+                'assigned_to' =>
+                    $incidentAssignment->assignedTo?->name,
 
-                'assigned_at' => $incidentAssignment
-                    ->assigned_at
-                    ?->toISOString(),
+                'assigned_at' =>
+                    $incidentAssignment
+                        ->assigned_at
+                        ?->toISOString(),
 
-                'completed_at' => $incidentAssignment
-                    ->completed_at
-                    ?->toISOString(),
+                'completed_at' =>
+                    $incidentAssignment
+                        ->completed_at
+                        ?->toISOString(),
             ],
         ]);
     }
 
-    public function media(int $analysisId, int $mediaId)
-    {
-        $analysis = ComplaintAIAnalysis::with('complaint')
-            ->findOrFail($analysisId);
+    /**
+     * Get AI job media.
+     */
+    public function media(
+        int $analysisId,
+        int $mediaId
+    ) {
+        $analysis = ComplaintAIAnalysis::with([
+            'complaint',
+        ])->findOrFail($analysisId);
 
         $media = $analysis->complaint
             ->media()
             ->where('id', $mediaId)
             ->firstOrFail();
 
-        if (!Storage::disk('public')->exists($media->file_path)) {
+        if (
+            !Storage::disk('public')
+                ->exists($media->file_path)
+        ) {
             return response()->json([
                 'success' => false,
                 'message' => 'Media file not found.',
@@ -283,7 +504,8 @@ class AIJobController extends Controller
             $media->file_path,
             basename($media->file_path),
             [
-                'Content-Type' => $media->mime_type,
+                'Content-Type' =>
+                    $media->mime_type,
             ]
         );
     }

@@ -9,7 +9,9 @@ use App\Http\Controllers\Api\FieldOfficerController;
 use App\Http\Controllers\API\AuthController;
 use App\Http\Middleware\AIWorkerAuth;
 use App\Http\Controllers\Api\ResolutionProofController;
-
+use App\Http\Controllers\Api\ResolutionAIJobController;
+use App\Http\Controllers\Api\AdminDashboardController;
+use App\Http\Controllers\Api\CitizenRewardController;
 
 // ---------------------------------------------------------
 // Citizen APIs
@@ -37,6 +39,7 @@ Route::post('/location/detect-ward', [
 
 Route::middleware(AIWorkerAuth::class)->group(function () {
 
+    // Existing complaint AI
     Route::get('/ai/jobs/pending', [
         AIJobController::class,
         'pending',
@@ -52,6 +55,21 @@ Route::middleware(AIWorkerAuth::class)->group(function () {
         'result',
     ]);
 
+    // Resolution AI
+    Route::get('/ai/resolution-jobs/pending', [
+        ResolutionAIJobController::class,
+        'pending',
+    ]);
+
+    Route::get('/ai/resolution-jobs/{proofId}/media', [
+        ResolutionAIJobController::class,
+        'media',
+    ]);
+
+    Route::post('/ai/resolution-jobs/{proofId}/result', [
+        ResolutionAIJobController::class,
+        'result',
+    ]);
 });
 
 
@@ -81,9 +99,83 @@ Route::middleware('auth:sanctum')->group(function () {
         'logout',
     ]);
 
+    // Citizen complaint tracking
     Route::get('/citizen/complaints', [
         \App\Http\Controllers\Api\CitizenComplaintController::class,
         'index',
+    ]);
+
+    // Citizen resolution verification
+    Route::post('/citizen/complaints/{complaintNumber}/verify-resolved', [
+        \App\Http\Controllers\Api\CitizenComplaintController::class,
+        'verifyResolved',
+    ]);
+
+    // Citizen reopen
+    Route::post('/citizen/complaints/{complaintNumber}/reopen', [
+        \App\Http\Controllers\Api\CitizenComplaintController::class,
+        'reopen',
+    ]);
+
+    Route::get('/citizen/rewards', [
+        CitizenRewardController::class,
+        'rewards',
+    ]);
+
+    Route::get('/citizen/certificates', [
+        CitizenRewardController::class,
+        'certificates',
+    ]);
+});
+
+
+// ---------------------------------------------------------
+// Admin Command Center APIs
+// ---------------------------------------------------------
+
+// Route::middleware([
+//     'auth:sanctum',
+//     'role:admin',
+// ])->prefix('admin')->group(function () {
+
+//     Route::get('/dashboard', [
+//         AdminDashboardController::class,
+//         'dashboard',
+//     ]);
+
+// });
+// ---------------------------------------------------------
+// Admin Command Center APIs
+// ---------------------------------------------------------
+
+Route::middleware([
+    'auth:sanctum',
+    'role:admin',
+])->prefix('admin')->group(function () {
+
+    Route::get('/dashboard', [
+        AdminDashboardController::class,
+        'dashboard',
+    ]);
+
+    Route::get('/incidents', [
+        AdminDashboardController::class,
+        'incidents',
+    ]);
+
+    Route::get('/incidents/{incident}', [
+        AdminDashboardController::class,
+        'incidentDetail',
+    ]);
+
+    Route::get('/sla', [
+        AdminDashboardController::class,
+        'sla',
+    ]);
+
+    Route::get('/map', [
+        AdminDashboardController::class,
+        'map',
     ]);
 
 });

@@ -12,6 +12,9 @@ export default defineConfig({
 
     // Citizen
     'resources/js/citizen/tracking.js',
+
+    // Admin
+    'resources/js/admin/dashboard.js',
 ],
             refresh: true,
             fonts: [

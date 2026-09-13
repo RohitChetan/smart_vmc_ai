@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\SlaMonitorService;
 
 class FieldOfficerController extends Controller
 {
@@ -306,6 +307,14 @@ class FieldOfficerController extends Controller
      *
      * Status changes are performed through the incident assigned
      * to the authenticated officer.
+     *
+     * Flow:
+     *
+     * assigned
+     *     ↓
+     * in_progress
+     *     ↓
+     * resolved
      */
     public function updateStatus(
         Request $request,
@@ -391,6 +400,12 @@ class FieldOfficerController extends Controller
             ], 422);
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Transaction
+        |--------------------------------------------------------------------------
+        */
+
         DB::transaction(function () use (
             $complaint,
             $incident,
@@ -398,41 +413,106 @@ class FieldOfficerController extends Controller
             $officer
         ) {
 
-            /*
-            |--------------------------------------------------------------------------
-            | Update Complaint
-            |--------------------------------------------------------------------------
-            */
-
-            $complaintUpdate = [
-                'status' => $data['status'],
-            ];
-
-            if ($data['status'] === 'resolved') {
-                $complaintUpdate['resolved_at'] = now();
-            }
-
-            $complaint->update($complaintUpdate);
+            $now = now();
 
             /*
             |--------------------------------------------------------------------------
-            | Update Incident
+            | IN PROGRESS
             |--------------------------------------------------------------------------
             */
 
             if ($data['status'] === 'in_progress') {
 
+                /*
+                |--------------------------------------------------------------------------
+                | Complaint
+                |--------------------------------------------------------------------------
+                */
+
+                $complaint->update([
+                    'status' => 'in_progress',
+                ]);
+
+                /*
+                |--------------------------------------------------------------------------
+                | Incident
+                |--------------------------------------------------------------------------
+                */
+
                 $incident->update([
                     'status' => 'in_progress',
                 ]);
+
+                /*
+                |--------------------------------------------------------------------------
+                | Start Incident Assignment
+                |--------------------------------------------------------------------------
+                */
+
+                $assignment = $incident->assignments
+                    ->whereNull('completed_at')
+                    ->sortByDesc('id')
+                    ->first();
+
+                if ($assignment && !$assignment->started_at) {
+                    $assignment->update([
+                        'started_at' => $now,
+                    ]);
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Complaint Status History
+                |--------------------------------------------------------------------------
+                */
+
+                $complaint->statusHistory()->create([
+                    'status' => 'in_progress',
+                    'changed_by' => $officer->id,
+                    'remarks' =>
+                        $data['remarks']
+                        ?? 'Field officer started working on the complaint.',
+                ]);
             }
+
+            /*
+            |--------------------------------------------------------------------------
+            | RESOLVED
+            |--------------------------------------------------------------------------
+            */
 
             if ($data['status'] === 'resolved') {
 
+                /*
+                |--------------------------------------------------------------------------
+                | Complaint
+                |--------------------------------------------------------------------------
+                */
+
+                $complaint->update([
+                    'status' => 'resolved',
+                    'resolved_at' => $now,
+                ]);
+
+                /*
+                |--------------------------------------------------------------------------
+                | Incident
+                |--------------------------------------------------------------------------
+                */
+
                 $incident->update([
                     'status' => 'resolved',
-                    'resolved_at' => now(),
+                    'resolved_at' => $now,
                 ]);
+
+                /*
+                |--------------------------------------------------------------------------
+                | Resolve Active SLA Escalations
+                |--------------------------------------------------------------------------
+                */
+
+                app(SlaMonitorService::class)
+                    ->resolveForIncident($incident);
 
                 /*
                 |--------------------------------------------------------------------------
@@ -447,39 +527,31 @@ class FieldOfficerController extends Controller
 
                 if ($assignment) {
                     $assignment->update([
-                        'completed_at' => now(),
+                        'completed_at' => $now,
                     ]);
                 }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Complaint Status History
+                |--------------------------------------------------------------------------
+                */
+
+                $complaint->statusHistory()->create([
+                    'status' => 'resolved',
+                    'changed_by' => $officer->id,
+                    'remarks' =>
+                        $data['remarks']
+                        ?? 'Field officer marked the complaint as resolved.',
+                ]);
             }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Complaint Status History
-            |--------------------------------------------------------------------------
-            */
-
-            $complaint->statusHistory()->create([
-                'status' =>
-                    $data['status'],
-
-                'changed_by' =>
-                    $officer->id,
-
-                'remarks' =>
-                    $data['remarks']
-                    ?? match ($data['status']) {
-
-                        'in_progress' =>
-                            'Field officer started working on the complaint.',
-
-                        'resolved' =>
-                            'Field officer marked the complaint as resolved.',
-
-                        default =>
-                            'Complaint status updated.',
-                    },
-            ]);
         });
+
+        /*
+        |--------------------------------------------------------------------------
+        | Fresh Data
+        |--------------------------------------------------------------------------
+        */
 
         $complaint->refresh();
         $incident->refresh();

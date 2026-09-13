@@ -261,6 +261,14 @@
                 Thank you for helping keep Vadodara clean and better.
             </p>
 
+            <button
+                type="button"
+                id="reopenButton"
+                class="mt-4 w-full rounded-2xl border border-red-200 bg-white px-5 py-3.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+            >
+                Issue Still Not Resolved? Reopen Complaint
+            </button>
+
         </div>
 
     </div>

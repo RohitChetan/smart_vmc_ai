@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'name',
@@ -36,5 +37,10 @@ class User extends Authenticatable
             'password' => 'hashed',
             'ward_id' => 'integer',
         ];
+    }
+
+    public function incidentAssignments(): HasMany
+    {
+        return $this->hasMany(IncidentAssignment::class, 'assigned_to');
     }
 }
