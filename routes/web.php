@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\View;
 
 Route::get('/', function () {
     return redirect()->route('citizen.home');
@@ -41,3 +42,7 @@ Route::get('/admin/login', function () {
 Route::get('/admin/dashboard', function () {
     return view('admin.dashboard');
 })->name('admin.dashboard');
+
+Route::get('/admin/master', function () {
+    return view('admin.master.index');
+});

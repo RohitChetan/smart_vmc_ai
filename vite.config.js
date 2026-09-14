@@ -15,6 +15,7 @@ export default defineConfig({
 
     // Admin
     'resources/js/admin/dashboard.js',
+    'resources/js/admin/master.js',
 ],
             refresh: true,
             fonts: [

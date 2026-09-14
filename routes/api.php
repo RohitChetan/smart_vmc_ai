@@ -12,6 +12,8 @@ use App\Http\Controllers\Api\ResolutionProofController;
 use App\Http\Controllers\Api\ResolutionAIJobController;
 use App\Http\Controllers\Api\AdminDashboardController;
 use App\Http\Controllers\Api\CitizenRewardController;
+use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\AdminMasterController;
 
 // ---------------------------------------------------------
 // Citizen APIs
@@ -181,6 +183,108 @@ Route::middleware([
 });
 
 
+
+/*
+|--------------------------------------------------------------------------
+| Admin Master Management
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware(['auth:sanctum', 'role:admin'])
+    ->prefix('admin/master')
+    ->group(function () {
+
+        // Overview
+        Route::get('/overview', [
+            AdminMasterController::class,
+            'overview'
+        ]);
+
+        // Departments
+        Route::get('/departments', [
+            AdminMasterController::class,
+            'departments'
+        ]);
+
+        Route::post('/departments', [
+            AdminMasterController::class,
+            'storeDepartment'
+        ]);
+
+        Route::put('/departments/{department}', [
+            AdminMasterController::class,
+            'updateDepartment'
+        ]);
+
+        Route::delete('/departments/{department}', [
+            AdminMasterController::class,
+            'destroyDepartment'
+        ]);
+
+        // Categories
+        Route::get('/categories', [
+            AdminMasterController::class,
+            'categories'
+        ]);
+
+        Route::post('/categories', [
+            AdminMasterController::class,
+            'storeCategory'
+        ]);
+
+        Route::put('/categories/{category}', [
+            AdminMasterController::class,
+            'updateCategory'
+        ]);
+
+        Route::delete('/categories/{category}', [
+            AdminMasterController::class,
+            'destroyCategory'
+        ]);
+
+        // Wards
+        Route::get('/wards', [
+            AdminMasterController::class,
+            'wards'
+        ]);
+
+        Route::post('/wards', [
+            AdminMasterController::class,
+            'storeWard'
+        ]);
+
+        Route::put('/wards/{ward}', [
+            AdminMasterController::class,
+            'updateWard'
+        ]);
+
+        Route::delete('/wards/{ward}', [
+            AdminMasterController::class,
+            'destroyWard'
+        ]);
+
+        // Users
+        Route::get('/users', [
+            AdminMasterController::class,
+            'users'
+        ]);
+
+        Route::post('/users', [
+            AdminMasterController::class,
+            'storeUser'
+        ]);
+
+        Route::put('/users/{user}', [
+            AdminMasterController::class,
+            'updateUser'
+        ]);
+
+        Route::delete('/users/{user}', [
+            AdminMasterController::class,
+            'destroyUser'
+        ]);
+    });
+
 // ---------------------------------------------------------
 // Field Officer APIs
 // ---------------------------------------------------------
@@ -205,4 +309,10 @@ Route::middleware([
         'store',
     ]);
 
+});
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'read']);
+    Route::post('/notifications/read-all', [NotificationController::class, 'readAll']);
 });

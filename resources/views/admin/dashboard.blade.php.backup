@@ -551,90 +551,6 @@
                 grid-template-columns:1fr;
             }
         }
-
-        /* =========================================================
-           ADMIN SIDEBAR
-           ========================================================= */
-        .admin-layout { min-height:100vh; position:relative; }
-        .admin-sidebar {
-            position:fixed; left:0; top:0; bottom:0; width:255px;
-            background:#111827; color:#fff; z-index:1100;
-            display:flex; flex-direction:column;
-            border-right:1px solid rgba(255,255,255,.08);
-        }
-        .sidebar-brand {
-            min-height:82px; padding:18px; display:flex; align-items:center;
-            gap:11px; border-bottom:1px solid rgba(255,255,255,.08);
-        }
-        .sidebar-logo {
-            width:40px; height:40px; border-radius:10px; background:#2563eb;
-            display:flex; align-items:center; justify-content:center;
-            font-size:14px; font-weight:800; flex-shrink:0;
-        }
-        .sidebar-brand strong { display:block; font-size:14px; line-height:1.2; }
-        .sidebar-brand small { display:block; margin-top:3px; color:#9ca3af; font-size:10px; }
-        .sidebar-nav { flex:1; overflow-y:auto; padding:18px 12px; }
-        .sidebar-section-title {
-            color:#6b7280; font-size:10px; font-weight:800;
-            letter-spacing:.08em; padding:12px 11px 7px;
-        }
-        .sidebar-link,.sidebar-sub-link {
-            display:flex; align-items:center; gap:10px; width:100%;
-            text-decoration:none; color:#d1d5db; border-radius:8px;
-            margin-bottom:3px; transition:background .15s ease,color .15s ease;
-        }
-        .sidebar-link { min-height:42px; padding:9px 11px; font-size:13px; font-weight:600; }
-        .sidebar-sub-link { min-height:34px; padding:7px 11px 7px 36px; font-size:12px; color:#9ca3af; }
-        .sidebar-link:hover,.sidebar-sub-link:hover { color:#fff; background:rgba(255,255,255,.07); }
-        .sidebar-link.active { background:#2563eb; color:#fff; }
-        .sidebar-link span:first-child,.sidebar-sub-link span:first-child { width:20px; text-align:center; }
-        .sidebar-badge {
-            margin-left:auto; min-width:20px; height:20px; padding:0 5px;
-            border-radius:999px; background:#dc2626; color:#fff; font-size:10px;
-            display:inline-flex; align-items:center; justify-content:center;
-        }
-        .sidebar-bottom { padding:14px 12px; border-top:1px solid rgba(255,255,255,.08); }
-        .sidebar-admin { display:flex; align-items:center; gap:9px; padding:8px 7px 12px; }
-        .admin-avatar {
-            width:34px; height:34px; border-radius:50%; background:#374151;
-            display:flex; align-items:center; justify-content:center;
-            font-weight:700; font-size:12px;
-        }
-        .sidebar-admin strong { display:block; font-size:12px; }
-        .sidebar-admin small { display:block; margin-top:2px; color:#9ca3af; font-size:10px; }
-        .sidebar-logout {
-            width:100%; border:1px solid rgba(255,255,255,.1);
-            background:transparent; color:#d1d5db; border-radius:8px;
-            padding:9px; font-size:12px; cursor:pointer;
-        }
-        .sidebar-logout:hover { background:rgba(255,255,255,.07); color:#fff; }
-        .sidebar-overlay { display:none; }
-        .sidebar-toggle { display:none; }
-        .admin-layout > .topbar,.admin-layout > main { margin-left:255px; }
-        .admin-layout > .topbar { width:calc(100% - 255px); }
-        .admin-anchor-section { scroll-margin-top:90px; }
-
-        @media(max-width:900px) {
-            .admin-sidebar {
-                transform:translateX(-100%); transition:transform .2s ease;
-                box-shadow:8px 0 25px rgba(0,0,0,.18);
-            }
-            .admin-sidebar.sidebar-open { transform:translateX(0); }
-            .sidebar-overlay.sidebar-open {
-                display:block; position:fixed; inset:0;
-                background:rgba(0,0,0,.45); z-index:1090;
-            }
-            .sidebar-toggle {
-                display:inline-flex; width:38px; height:38px;
-                border:1px solid rgba(255,255,255,.15);
-                background:transparent; color:#fff; border-radius:8px;
-                align-items:center; justify-content:center; font-size:18px;
-                cursor:pointer; flex-shrink:0;
-            }
-            .admin-layout > .topbar,.admin-layout > main { margin-left:0; }
-            .admin-layout > .topbar { width:100%; }
-        }
-
     </style>
 </head>
 
@@ -642,94 +558,14 @@
 
 <div class="admin-layout">
 
-    <!-- ADMIN SIDEBAR -->
-    <aside class="admin-sidebar" id="adminSidebar">
-        <div class="sidebar-brand">
-            <div class="sidebar-logo">SV</div>
-            <div>
-                <strong>Smart Vadodara</strong>
-                <small>AI Civic Command Center</small>
-            </div>
-        </div>
-
-        <nav class="sidebar-nav">
-            <div class="sidebar-section-title">OPERATIONS</div>
-
-            <a href="/admin/dashboard" class="sidebar-link active" onclick="closeAdminSidebar()">
-                <span>🏠</span><span>Dashboard</span>
-            </a>
-
-            <a href="#incidentsSection" class="sidebar-link"
-               onclick="scrollToAdminSection('incidentsSection')">
-                <span>📋</span><span>Incidents</span>
-            </a>
-
-            <a href="#mapSection" class="sidebar-link"
-               onclick="scrollToAdminSection('mapSection')">
-                <span>🗺️</span><span>Live Map</span>
-            </a>
-
-            <a href="#slaSection" class="sidebar-link"
-               onclick="scrollToAdminSection('slaSection')">
-                <span>⏱️</span><span>SLA & Escalations</span>
-            </a>
-
-            <a href="#analyticsSection" class="sidebar-link"
-               onclick="scrollToAdminSection('analyticsSection')">
-                <span>📊</span><span>Analytics</span>
-            </a>
-
-            <a href="#notificationsSection" class="sidebar-link"
-               onclick="openAdminNotificationsFromSidebar(event)">
-                <span>🔔</span><span>Notifications</span>
-                <span id="sidebarNotificationBadge" class="sidebar-badge" style="display:none;">0</span>
-            </a>
-
-            <div class="sidebar-section-title">MASTER MANAGEMENT</div>
-
-            <a href="/admin/master" class="sidebar-link">
-                <span>⚙️</span><span>Master Management</span>
-            </a>
-            <a href="/admin/master" class="sidebar-sub-link">
-                <span>🏢</span><span>Departments</span>
-            </a>
-            <a href="/admin/master" class="sidebar-sub-link">
-                <span>🏷️</span><span>Categories</span>
-            </a>
-            <a href="/admin/master" class="sidebar-sub-link">
-                <span>🏘️</span><span>Wards</span>
-            </a>
-            <a href="/admin/master" class="sidebar-sub-link">
-                <span>👥</span><span>Users</span>
-            </a>
-        </nav>
-
-        <div class="sidebar-bottom">
-            <div class="sidebar-admin">
-                <div class="admin-avatar">A</div>
-                <div>
-                    <strong>Administrator</strong>
-                    <small>System Admin</small>
-                </div>
-            </div>
-            <button type="button" class="sidebar-logout" onclick="adminLogout()">
-                🚪 Logout
-            </button>
-        </div>
-    </aside>
-
-    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeAdminSidebar()"></div>
-
     <header class="topbar">
-        <button type="button" class="sidebar-toggle"
-                onclick="toggleAdminSidebar()" aria-label="Open menu">☰</button>
         <div class="brand">
             Smart Vadodara
             <small>AI Civic Command Center</small>
         </div>
 
         <div style="display:flex;align-items:center;gap:10px;">
-            <div class="admin-notification-wrap admin-anchor-section" id="notificationsSection">
+            <div class="admin-notification-wrap">
                 <button
                     type="button"
                     id="adminNotificationButton"
@@ -867,7 +703,7 @@
         </div>
 
         <!-- MAP + SLA -->
-        <div class="main-grid admin-anchor-section" id="mapSection">
+        <div class="main-grid">
 
             <div class="card">
                 <div class="section-title">
@@ -879,7 +715,7 @@
 
             <div>
 
-                <div class="card admin-anchor-section" id="slaSection">
+                <div class="card">
                     <div class="section-title">
                         🚨 SLA Alerts
                     </div>
@@ -904,7 +740,7 @@
         </div>
 
         <!-- ANALYTICS -->
-        <div class="analytics-grid admin-anchor-section" id="analyticsSection">
+        <div class="analytics-grid">
 
             <div class="card analytics-card">
                 <div class="section-title">📊 Priority Distribution</div>
@@ -945,7 +781,7 @@
         </div>
 
         <!-- INCIDENT TABLE -->
-        <div class="card table-card admin-anchor-section" id="incidentsSection">
+        <div class="card table-card">
 
             <div class="section-title">
                 📋 Incident Operations
@@ -1031,47 +867,6 @@
         <div id="incidentDetails"></div>
     </div>
 </div>
-
-
-<script>
-function toggleAdminSidebar() {
-    document.getElementById('adminSidebar')?.classList.toggle('sidebar-open');
-    document.getElementById('sidebarOverlay')?.classList.toggle('sidebar-open');
-}
-
-function closeAdminSidebar() {
-    document.getElementById('adminSidebar')?.classList.remove('sidebar-open');
-    document.getElementById('sidebarOverlay')?.classList.remove('sidebar-open');
-}
-
-function scrollToAdminSection(sectionId) {
-    const section = document.getElementById(sectionId);
-    if (!section) return;
-    section.scrollIntoView({ behavior:'smooth', block:'start' });
-    closeAdminSidebar();
-}
-
-function openAdminNotificationsFromSidebar(event) {
-    if (event) event.preventDefault();
-    closeAdminSidebar();
-    if (typeof toggleAdminNotifications === 'function') {
-        toggleAdminNotifications(event);
-    }
-}
-
-function adminLogout() {
-    if (!confirm('Are you sure you want to logout?')) return;
-    localStorage.removeItem('smart_vadodara_admin_token');
-    localStorage.removeItem('smart_vadodara_admin_user');
-    window.location.href = '/admin/login';
-}
-
-window.toggleAdminSidebar = toggleAdminSidebar;
-window.closeAdminSidebar = closeAdminSidebar;
-window.scrollToAdminSection = scrollToAdminSection;
-window.openAdminNotificationsFromSidebar = openAdminNotificationsFromSidebar;
-window.adminLogout = adminLogout;
-</script>
 
 </body>
 </html>

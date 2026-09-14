@@ -17,6 +17,21 @@ class SlaMonitorService
     {
         $now = now();
 
+        /*
+        |--------------------------------------------------------------------------
+        | Resolve stale SLA escalations
+        |--------------------------------------------------------------------------
+        |
+        | Once an incident reaches verification_pending,
+        | resolved, or closed state, it should no longer
+        | have an active SLA escalation.
+        |
+        | This also cleans up old/stale escalation records
+        | created before the incident status changed.
+        |
+        */
+        $this->resolveInactiveIncidentEscalations();
+
         $incidents = CivicIncident::query()
             ->whereNotNull('due_at')
             ->whereIn('status', [
@@ -60,6 +75,26 @@ class SlaMonitorService
         }
 
         return $summary;
+    }
+
+    /**
+     * Resolve active escalations for incidents
+     * that are no longer SLA-monitored.
+     */
+    private function resolveInactiveIncidentEscalations(): int
+    {
+        return IncidentEscalation::query()
+            ->whereNull('resolved_at')
+            ->whereHas('incident', function ($query) {
+                $query->whereIn('status', [
+                    'verification_pending',
+                    'resolved',
+                    'closed',
+                ]);
+            })
+            ->update([
+                'resolved_at' => now(),
+            ]);
     }
 
     /**

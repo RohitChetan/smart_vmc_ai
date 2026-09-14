@@ -2,6 +2,13 @@ let map;
 let markers = [];
 
 const TOKEN_KEY = 'smart_vadodara_admin_token';
+
+// let currentFilters = {
+//     ward_id: '',
+//     priority: '',
+//     status: '',
+//     department_id: ''
+// };
 let currentFilters = {
     ward_id: '',
     priority: '',
@@ -21,13 +28,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initializeMap();
     loadDashboard();
+
     loadAdminNotifications();
 
-    if (!adminNotificationPollTimer) {
-        adminNotificationPollTimer = setInterval(() => {
+        setInterval(() => {
             loadAdminNotifications();
         }, 15000);
-    }
 
         document.getElementById('filterSearch')
             ?.addEventListener('input', debounce(() => {
@@ -165,6 +171,13 @@ window.clearFilters = function () {
     document.getElementById('filterStatus').value = '';
     document.getElementById('filterDepartment').value = '';
     document.getElementById('filterSearch').value = '';
+
+    // currentFilters = {
+    //     ward_id: '',
+    //     priority: '',
+    //     status: '',
+    //     department_id: ''
+    // };
     currentFilters = {
         ward_id: '',
         priority: '',
@@ -182,9 +195,7 @@ window.loadDashboard = async function () {
     const errorBox =
         document.getElementById('errorBox');
 
-    if (errorBox) {
-        errorBox.style.display = 'none';
-    }
+    errorBox.style.display = 'none';
 
     try {
 
@@ -233,13 +244,11 @@ window.loadDashboard = async function () {
             error.message !==
             'Authentication expired.'
         ) {
-            if (errorBox) {
-                errorBox.innerText =
-                    error.message ||
-                    'Unable to load Admin Command Center data.';
+            errorBox.innerText =
+                error.message ||
+                'Unable to load Admin Command Center data.';
 
-                errorBox.style.display = 'block';
-            }
+            errorBox.style.display = 'block';
         }
     }
 };
@@ -1811,7 +1820,6 @@ function debounce(fn, wait) {
 */
 
 let adminNotificationsData = [];
-let adminNotificationPollTimer = null;
 
 
 async function loadAdminNotifications(
@@ -2034,19 +2042,17 @@ function closeAdminNotifications() {
 async function handleAdminNotificationClick(
     notificationId
 ) {
+
+    await markAdminNotificationRead(
+        notificationId
+    );
+
     const notification =
         adminNotificationsData.find(
             item =>
                 String(item.id) ===
                 String(notificationId)
         );
-
-    const markedRead =
-        await markAdminNotificationRead(notificationId);
-
-    if (!markedRead) {
-        return;
-    }
 
     const data =
         notification?.data ?? {};
@@ -2058,7 +2064,10 @@ async function handleAdminNotificationClick(
     closeAdminNotifications();
 
     if (url) {
-        window.location.href = url;
+
+        window.location.href =
+            url;
+
         return;
     }
 
@@ -2069,38 +2078,31 @@ async function handleAdminNotificationClick(
 async function markAdminNotificationRead(
     notificationId
 ) {
+
     try {
-        const response = await fetch(
-            `/api/notifications/${encodeURIComponent(notificationId)}/read`,
+
+        await fetch(
+            `/api/notifications/${encodeURIComponent(
+                notificationId
+            )}/read`,
             {
                 method: 'POST',
+
                 headers: {
                     ...getAuthHeaders(),
-                    'Content-Type': 'application/json'
+
+                    'Content-Type':
+                        'application/json'
                 }
             }
         );
 
-        if (response.status === 401) {
-            localStorage.removeItem(TOKEN_KEY);
-            localStorage.removeItem('smart_vadodara_admin_user');
-            window.location.href = '/admin/login';
-            return false;
-        }
-
-        if (!response.ok) {
-            throw new Error(
-                `Unable to mark notification as read: ${response.status}`
-            );
-        }
-
-        return true;
     } catch (error) {
+
         console.error(
             'Unable to mark notification as read:',
             error
         );
-        return false;
     }
 }
 
@@ -2108,35 +2110,29 @@ async function markAdminNotificationRead(
 async function markAllAdminNotificationsRead(
     event
 ) {
+
     event?.stopPropagation();
 
     try {
-        const response = await fetch(
+
+        await fetch(
             '/api/notifications/read-all',
             {
                 method: 'POST',
+
                 headers: {
                     ...getAuthHeaders(),
-                    'Content-Type': 'application/json'
+
+                    'Content-Type':
+                        'application/json'
                 }
             }
         );
 
-        if (response.status === 401) {
-            localStorage.removeItem(TOKEN_KEY);
-            localStorage.removeItem('smart_vadodara_admin_user');
-            window.location.href = '/admin/login';
-            return;
-        }
-
-        if (!response.ok) {
-            throw new Error(
-                `Unable to mark all notifications as read: ${response.status}`
-            );
-        }
-
         await loadAdminNotifications(true);
+
     } catch (error) {
+
         console.error(
             'Unable to mark all notifications as read:',
             error
@@ -2223,75 +2219,3 @@ document.addEventListener(
         }
     }
 );
-
-/* =========================================================
-   ADMIN SIDEBAR
-   ========================================================= */
-
-function toggleAdminSidebar() {
-    const sidebar = document.getElementById('adminSidebar');
-    const overlay = document.getElementById('sidebarOverlay');
-
-    sidebar?.classList.toggle('sidebar-open');
-    overlay?.classList.toggle('sidebar-open');
-}
-
-function closeAdminSidebar() {
-    const sidebar = document.getElementById('adminSidebar');
-    const overlay = document.getElementById('sidebarOverlay');
-
-    sidebar?.classList.remove('sidebar-open');
-    overlay?.classList.remove('sidebar-open');
-}
-
-function scrollToAdminSection(sectionId) {
-    const section = document.getElementById(sectionId);
-
-    if (!section) {
-        return;
-    }
-
-    section.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
-    });
-
-    closeAdminSidebar();
-}
-
-function openAdminNotificationsFromSidebar(event) {
-    event?.preventDefault();
-
-    closeAdminSidebar();
-
-    if (typeof toggleAdminNotifications === 'function') {
-        toggleAdminNotifications(event);
-    }
-}
-
-function adminLogout() {
-    const confirmed = confirm(
-        'Are you sure you want to logout?'
-    );
-
-    if (!confirmed) {
-        return;
-    }
-
-    localStorage.removeItem(
-        'smart_vadodara_admin_token'
-    );
-
-    localStorage.removeItem(
-        'smart_vadodara_admin_user'
-    );
-
-    window.location.href = '/admin/login';
-}
-
-window.toggleAdminSidebar = toggleAdminSidebar;
-window.closeAdminSidebar = closeAdminSidebar;
-window.scrollToAdminSection = scrollToAdminSection;
-window.openAdminNotificationsFromSidebar =
-    openAdminNotificationsFromSidebar;
-window.adminLogout = adminLogout;

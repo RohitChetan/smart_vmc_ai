@@ -9,19 +9,38 @@ use Illuminate\Support\Facades\DB;
 
 class IncidentAssignmentService
 {
+    /**
+     * Assign an incident to a ward officer.
+     *
+     * Flow:
+     * 1. Check existing active assignment.
+     * 2. Repair assignment if officer is missing.
+     * 3. Find ward officer automatically when required.
+     * 4. Create assignment if none exists.
+     * 5. Keep incident status synchronized.
+     * 6. Automatically calculate SLA due_at.
+     */
     public function assign(
         CivicIncident $incident,
         ?User $assignedTo = null,
         ?User $assignedBy = null,
         ?string $notes = null
     ): IncidentAssignment {
-
         return DB::transaction(function () use (
             $incident,
             $assignedTo,
             $assignedBy,
             $notes
         ) {
+            /*
+            |--------------------------------------------------------------------------
+            | Refresh Incident
+            |--------------------------------------------------------------------------
+            |
+            | Make sure we are working with the latest database state.
+            |
+            */
+            $incident->refresh();
 
             /*
             |--------------------------------------------------------------------------
@@ -38,36 +57,46 @@ class IncidentAssignmentService
             if ($existingAssignment) {
 
                 /*
-                | Existing assignment has no officer:
-                | attempt automatic repair.
+                |--------------------------------------------------------------------------
+                | Repair Existing Assignment
+                |--------------------------------------------------------------------------
+                |
+                | If an active assignment exists but no officer is attached,
+                | attempt automatic officer assignment.
+                |
                 */
+
                 if (!$existingAssignment->assigned_to) {
 
                     $officer = $assignedTo
-                        ?? $this->findOfficerForIncident(
-                            $incident
-                        );
+                        ?? $this->findOfficerForIncident($incident);
 
                     if ($officer) {
                         $existingAssignment->update([
-                            'assigned_to' =>
-                                $officer->id,
+                            'assigned_to' => $officer->id,
                         ]);
+
+                        /*
+                        | Keep local variable synchronized.
+                        */
+                        $assignedTo = $officer;
                     }
                 }
 
                 /*
-                | If an officer exists, incident must
-                | reflect assigned state.
+                |--------------------------------------------------------------------------
+                | Sync Incident State
+                |--------------------------------------------------------------------------
+                |
+                | If an officer exists, make sure the incident is in assigned
+                | state and has an SLA deadline.
+                |
                 */
-                if (
-                    $existingAssignment
-                        ->fresh()
-                        ->assigned_to
-                ) {
-                    $this->markIncidentAssigned(
-                        $incident
-                    );
+
+                $existingAssignment->refresh();
+
+                if ($existingAssignment->assigned_to) {
+                    $this->markIncidentAssigned($incident);
                 }
 
                 return $existingAssignment->fresh([
@@ -79,14 +108,12 @@ class IncidentAssignmentService
 
             /*
             |--------------------------------------------------------------------------
-            | Find Ward Officer
+            | Find Ward Officer Automatically
             |--------------------------------------------------------------------------
             */
 
             $assignedTo = $assignedTo
-                ?? $this->findOfficerForIncident(
-                    $incident
-                );
+                ?? $this->findOfficerForIncident($incident);
 
             /*
             |--------------------------------------------------------------------------
@@ -94,38 +121,31 @@ class IncidentAssignmentService
             |--------------------------------------------------------------------------
             */
 
-            $assignment =
-                IncidentAssignment::create([
-                    'incident_id' =>
-                        $incident->id,
+            $assignment = IncidentAssignment::create([
+                'incident_id' => $incident->id,
 
-                    'assigned_to' =>
-                        $assignedTo?->id,
+                'assigned_to' => $assignedTo?->id,
 
-                    'assigned_by' =>
-                        $assignedBy?->id,
+                'assigned_by' => $assignedBy?->id,
 
-                    'assigned_at' =>
-                        now(),
+                'assigned_at' => now(),
 
-                    'notes' =>
-                        $notes
-                        ?? 'Automatically assigned by Smart Vadodara incident routing engine.',
-                ]);
+                'notes' => $notes
+                    ?? 'Automatically assigned by Smart Vadodara incident routing engine.',
+            ]);
 
             /*
             |--------------------------------------------------------------------------
-            | Update Incident Status
+            | Update Incident Status + SLA
             |--------------------------------------------------------------------------
             |
-            | Only mark assigned when an actual officer exists.
+            | Only mark the incident as assigned when an actual officer
+            | exists.
             |
             */
 
             if ($assignedTo) {
-                $this->markIncidentAssigned(
-                    $incident
-                );
+                $this->markIncidentAssigned($incident);
             }
 
             return $assignment->fresh([
@@ -137,7 +157,11 @@ class IncidentAssignmentService
     }
 
     /**
-     * Find ward officer dynamically.
+     * Find a ward officer dynamically.
+     *
+     * The officer must:
+     * - Have ward_officer role
+     * - Belong to the incident's ward
      */
     private function findOfficerForIncident(
         CivicIncident $incident
@@ -148,23 +172,28 @@ class IncidentAssignmentService
 
         return User::query()
             ->where('role', 'ward_officer')
-            ->where(
-                'ward_id',
-                $incident->ward_id
-            )
+            ->where('ward_id', $incident->ward_id)
             ->orderBy('id')
             ->first();
     }
 
     /**
-     * Mark incident assigned.
+     * Mark incident as assigned and ensure SLA exists.
+     *
+     * Important:
+     * Existing active work must never be moved backwards.
      */
     private function markIncidentAssigned(
         CivicIncident $incident
     ): void {
+        $incident->refresh();
+
         /*
-        | Do not move active work backwards.
+        |--------------------------------------------------------------------------
+        | Do Not Move Active Work Backwards
+        |--------------------------------------------------------------------------
         */
+
         if (
             in_array(
                 $incident->status,
@@ -180,13 +209,44 @@ class IncidentAssignmentService
             return;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Assigned State + SLA
+        |--------------------------------------------------------------------------
+        */
+
         $incident->update([
             'status' => 'assigned',
+
+            /*
+            | Preserve existing SLA if already present.
+            | Otherwise calculate a fresh SLA based on priority.
+            */
+            'due_at' => $incident->due_at
+                ?? $this->calculateDueAt($incident->priority),
         ]);
     }
 
     /**
-     * Check active assignment.
+     * Calculate SLA deadline based on incident priority.
+     */
+    private function calculateDueAt(string $priority)
+    {
+        return match ($priority) {
+            'critical' => now()->addHours(2),
+
+            'high' => now()->addHours(12),
+
+            'medium' => now()->addHours(24),
+
+            'low' => now()->addHours(48),
+
+            default => now()->addHours(24),
+        };
+    }
+
+    /**
+     * Check whether an incident has an active assignment.
      */
     public function hasActiveAssignment(
         CivicIncident $incident
@@ -198,7 +258,7 @@ class IncidentAssignmentService
     }
 
     /**
-     * Get active assignment.
+     * Get the latest active assignment.
      */
     public function activeAssignment(
         CivicIncident $incident

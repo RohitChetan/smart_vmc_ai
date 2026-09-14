@@ -2,44 +2,60 @@
 
 namespace App\Models;
 
-use App\Models\Ward;
-use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable([
-    'name',
-    'email',
-    'password',
-    'role',
-    'ward_id',
-])]
-#[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
-    public function ward(): BelongsTo
-    {
-        return $this->belongsTo(Ward::class);
-    }
+    /**
+     * The attributes that are mass assignable.
+     */
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+        'role',
+        'ward_id',
+        'is_active',
+    ];
 
+    /**
+     * The attributes that should be hidden for serialization.
+     */
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
+    /**
+     * The attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'ward_id' => 'integer',
+            'is_active' => 'boolean',
         ];
     }
 
-    public function incidentAssignments(): HasMany
+    /**
+     * User belongs to a ward.
+     */
+    public function ward()
+    {
+        return $this->belongsTo(Ward::class);
+    }
+
+    /**
+     * Officer's incident assignments.
+     */
+    public function incidentAssignments()
     {
         return $this->hasMany(IncidentAssignment::class, 'assigned_to');
     }

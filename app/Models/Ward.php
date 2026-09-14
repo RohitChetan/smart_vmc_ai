@@ -20,7 +20,6 @@ class Ward extends Model
         'is_active' => 'boolean',
     ];
 
-
     public function incidents(): HasMany
     {
         return $this->hasMany(CivicIncident::class, 'ward_id');
@@ -29,5 +28,10 @@ class Ward extends Model
     public function complaints(): HasMany
     {
         return $this->hasMany(Complaint::class, 'ward_id');
+    }
+
+    public function users(): HasMany
+    {
+        return $this->hasMany(User::class, 'ward_id');
     }
 }

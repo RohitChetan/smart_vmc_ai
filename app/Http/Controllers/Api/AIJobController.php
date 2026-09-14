@@ -9,6 +9,7 @@ use App\Models\ComplaintStatusHistory;
 use App\Services\IncidentAssignmentService;
 use App\Services\IncidentClusteringService;
 use App\Services\WardLocator;
+use App\Notifications\CivicSystemNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -40,6 +41,7 @@ class AIJobController extends Controller
 
                     'complaint' => [
                         'id' => $job->complaint->id,
+
                         'complaint_number' =>
                             $job->complaint->complaint_number,
 
@@ -296,12 +298,81 @@ class AIJobController extends Controller
         |
         | One active field assignment per civic incident.
         |
+        | We first check whether an active assignment already exists.
+        | This prevents duplicate notifications when multiple complaints
+        | are clustered into the same incident.
+        |
         */
+
+        $hadActiveAssignment =
+            $incidentAssignmentService->hasActiveAssignment(
+                $incident->fresh()
+            );
 
         $incidentAssignment =
             $incidentAssignmentService->assign(
                 $incident->fresh()
             );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Notify Newly Assigned Ward Officer
+        |--------------------------------------------------------------------------
+        |
+        | Send notification only when a NEW active assignment was created.
+        | Existing assignments will not receive duplicate notifications.
+        |
+        */
+
+        if (
+            !$hadActiveAssignment &&
+            $incidentAssignment->assignedTo
+        ) {
+            $incidentAssignment->assignedTo->notify(
+                new CivicSystemNotification(
+                    title: 'New Civic Complaint Assigned',
+
+                    message: sprintf(
+                        '%s has been assigned to you for Ward %s.',
+                        $incident->incident_number,
+                        $incident->ward?->ward_no ?? 'Unknown'
+                    ),
+
+                    type: 'complaint_assigned',
+
+                    url: '/field/dashboard',
+
+                    data: [
+                        'incident_id' =>
+                            $incident->id,
+
+                        'incident_number' =>
+                            $incident->incident_number,
+
+                        'complaint_id' =>
+                            $complaint->id,
+
+                        'complaint_number' =>
+                            $complaint->complaint_number,
+
+                        'ward_id' =>
+                            $incident->ward_id,
+
+                        'ward_no' =>
+                            $incident->ward?->ward_no,
+
+                        'priority' =>
+                            $incident->priority,
+
+                        'category' =>
+                            $incident->category?->name,
+
+                        'department' =>
+                            $incident->department?->name,
+                    ],
+                )
+            );
+        }
 
         /*
         |--------------------------------------------------------------------------
@@ -441,17 +512,17 @@ class AIJobController extends Controller
                     'name' =>
                         $incident->ward?->name,
                 ],
+            ],
 
-                'assigned_officer' => [
-                    'id' =>
-                        $incidentAssignment->assignedTo?->id,
+            'assigned_officer' => [
+                'id' =>
+                    $incidentAssignment->assignedTo?->id,
 
-                    'name' =>
-                        $incidentAssignment->assignedTo?->name,
+                'name' =>
+                    $incidentAssignment->assignedTo?->name,
 
-                    'email' =>
-                        $incidentAssignment->assignedTo?->email,
-                ],
+                'email' =>
+                    $incidentAssignment->assignedTo?->email,
             ],
 
             'assignment' => [
