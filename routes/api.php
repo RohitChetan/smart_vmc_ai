@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\AdminDashboardController;
 use App\Http\Controllers\Api\CitizenRewardController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\AdminMasterController;
+use App\Http\Controllers\Api\AdminSettingsController;
 
 // ---------------------------------------------------------
 // Citizen APIs
@@ -183,6 +184,51 @@ Route::middleware([
 });
 
 
+
+// =====================================================
+// ADMIN SETTINGS
+// =====================================================
+
+Route::prefix('admin/settings')->group(function () {
+
+    // All settings grouped by category
+    Route::get('/', [
+        AdminSettingsController::class,
+        'index'
+    ]);
+
+    // One settings group
+    Route::get('/group/{group}', [
+        AdminSettingsController::class,
+        'group'
+    ]);
+
+    // Update multiple settings
+    Route::put('/', [
+        AdminSettingsController::class,
+        'update'
+    ]);
+
+    // Update one setting
+    Route::put('/{key}', [
+        AdminSettingsController::class,
+        'updateOne'
+    ])->where('key', '.*');
+
+    // Application logo
+    Route::post('/upload/logo', [
+        AdminSettingsController::class,
+        'uploadLogo'
+    ]);
+
+    // Application favicon
+    Route::post('/upload/favicon', [
+        AdminSettingsController::class,
+        'uploadFavicon'
+    ]);
+
+    Route::post('/test-email', [AdminSettingsController::class, 'testEmail']);
+});
 
 /*
 |--------------------------------------------------------------------------

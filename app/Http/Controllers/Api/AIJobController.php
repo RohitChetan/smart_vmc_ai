@@ -9,10 +9,10 @@ use App\Models\ComplaintStatusHistory;
 use App\Services\IncidentAssignmentService;
 use App\Services\IncidentClusteringService;
 use App\Services\WardLocator;
-use App\Notifications\CivicSystemNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use App\Services\Notifications\NotificationService;
 
 class AIJobController extends Controller
 {
@@ -99,7 +99,8 @@ class AIJobController extends Controller
         int $analysisId,
         IncidentClusteringService $incidentService,
         IncidentAssignmentService $incidentAssignmentService,
-        WardLocator $wardLocator
+        WardLocator $wardLocator,
+        NotificationService $notificationService
     ): JsonResponse {
         $data = $request->validate([
             'predicted_category' => [
@@ -328,21 +329,22 @@ class AIJobController extends Controller
             !$hadActiveAssignment &&
             $incidentAssignment->assignedTo
         ) {
-            $incidentAssignment->assignedTo->notify(
-                new CivicSystemNotification(
-                    title: 'New Civic Complaint Assigned',
+            $notificationService->send(
+                event: 'complaint_assigned',
+                user: $incidentAssignment->assignedTo,
+                complaint: $complaint,
+                data: [
+                    'title' => 'New Civic Complaint Assigned',
 
-                    message: sprintf(
+                    'message' => sprintf(
                         '%s has been assigned to you for Ward %s.',
                         $incident->incident_number,
                         $incident->ward?->ward_no ?? 'Unknown'
                     ),
 
-                    type: 'complaint_assigned',
+                    'url' => '/field/dashboard',
 
-                    url: '/field/dashboard',
-
-                    data: [
+                    'data' => [
                         'incident_id' =>
                             $incident->id,
 
@@ -370,7 +372,7 @@ class AIJobController extends Controller
                         'department' =>
                             $incident->department?->name,
                     ],
-                )
+                ]
             );
         }
 

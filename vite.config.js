@@ -7,16 +7,17 @@ export default defineConfig({
     plugins: [
         laravel({
             input: [
-    'resources/css/app.css',
-    'resources/js/app.js',
+                'resources/css/app.css',
+                'resources/js/app.js',
 
-    // Citizen
-    'resources/js/citizen/tracking.js',
+                // Citizen
+                'resources/js/citizen/tracking.js',
 
-    // Admin
-    'resources/js/admin/dashboard.js',
-    'resources/js/admin/master.js',
-],
+                // Admin
+                'resources/js/admin/dashboard.js',
+                'resources/js/admin/master.js',
+                'resources/js/admin/settings.js',
+            ],
             refresh: true,
             fonts: [
                 bunny('Instrument Sans', {
@@ -26,6 +27,7 @@ export default defineConfig({
         }),
         tailwindcss(),
     ],
+
     server: {
         watch: {
             ignored: ['**/storage/framework/views/**'],

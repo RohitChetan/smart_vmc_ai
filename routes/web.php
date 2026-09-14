@@ -46,3 +46,7 @@ Route::get('/admin/dashboard', function () {
 Route::get('/admin/master', function () {
     return view('admin.master.index');
 });
+
+Route::get('/admin/settings', function () {
+    return view('admin.settings.index');
+})->name('admin.settings');
